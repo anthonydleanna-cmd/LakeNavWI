@@ -19,4 +19,5 @@ cat > app/src/main/res/drawable/app_icon.xml <<'EOF'
     <path android:fillColor="#16A6C9" android:pathData="M54,30 L57,47 L53,45 L50,56 L49,45 L45,47 Z"/>
 </vector>
 EOF
+cp app/src/main/res/drawable/app_icon.xml app/src/main/res/drawable/app_icon_round.xml
 printf 'LakeNav WI v0.4 sources materialized for build.\n'
