@@ -1,0 +1,207 @@
+ickLayers() {
++    const panel = $('layersQuickPanel');
++    if (!panel) return;
++    panel.classList.toggle('open');
++    syncLayerControls();
++  }
++
++  function compassNameFromWind(deg) {
++    if (!Number.isFinite(Number(deg))) return '--';
++    const pts = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
++    return pts[Math.round(normalizeDegrees(deg) / 22.5) % 16];
++  }
++
++  function windVector(speedMph, fromDeg) {
++    const speed = Number(speedMph);
++    const dir = Number(fromDeg);
++    if (!Number.isFinite(speed) || !Number.isFinite(dir)) return { u:0, v:0, speed:0, from:0 };
++    const toward = normalizeDegrees(dir + 180) * Math.PI / 180;
++    return { u: speed * Math.sin(toward), v: speed * Math.cos(toward), speed, from: normalizeDegrees(dir) };
++  }
++
++  function windAt(lat, lon) {
++    const g = windGrid;
++    if (!g || !g.samples || g.rows < 2 || g.cols < 2) return null;
++    const x = Math.max(0, Math.min(g.cols - 1.000001, (Number(lon) - g.west) / (g.east - g.west) * (g.cols - 1)));
++    const y = Math.max(0, Math.min(g.rows - 1.000001, (Number(lat) - g.south) / (g.north - g.south) * (g.rows - 1)));
++    const c0 = Math.floor(x), c1 = Math.min(g.cols - 1, c0 + 1), tx = x - c0;
++    const r0 = Math.floor(y), r1 = Math.min(g.rows - 1, r0 + 1), ty = y - r0;
++    const a = g.samples[r0 * g.cols + c0], b = g.samples[r0 * g.cols + c1];
++    const c = g.samples[r1 * g.cols + c0], d = g.samples[r1 * g.cols + c1];
++    if (!(a && b && c && d)) return null;
++    const u0 = a.u * (1-tx) + b.u * tx, u1 = c.u * (1-tx) + d.u * tx;
++    const v0 = a.v * (1-tx) + b.v * tx, v1 = c.v * (1-tx) + d.v * tx;
++    const u = u0 * (1-ty) + u1 * ty, v = v0 * (1-ty) + v1 * ty;
++    return { u, v, speed: Math.sqrt(u*u + v*v) };
++  }
++
++  function windBounds() {
++    if (map) {
++      const b = map.getBounds().pad(0.18);
++      return { south:b.getSouth(), north:b.getNorth(), west:b.getWest(), east:b.getEast() };
++    }
++    if (currentLoc) {
++      const latPad = 0.16, lonPad = 0.22;
++      return { south:currentLoc.lat-latPad, north:currentLoc.lat+latPad, west:currentLoc.lon-lonPad, east:currentLoc.lon+lonPad };
++    }
++    return null;
++  }
++
++  function scheduleWindRefresh() {
++    if (!windEnabled || offlineMode) return;
++    clearTimeout(windFetchTimer);
++    windFetchTimer = setTimeout(() => loadWindField(false), 650);
++  }
++
++  async function loadWindField(force) {
++    if (!windEnabled || offlineMode || windLoading) return;
++    const bounds = windBounds();
++    if (!bounds) return;
++    if (!force && windGrid && Date.now() - windLastFetch < 8 * 60 * 1000) {
++      const cLat = (bounds.south+bounds.north)/2, cLon=(bounds.west+bounds.east)/2;
++      if (cLat >= windGrid.south && cLat <= windGrid.north && cLon >= windGrid.west && cLon <= windGrid.east) return;
++    }
++    windLoading = true;
++    if ($('quickWindStatus')) $('quickWindStatus').textContent = 'Loading modeled wind around this map…';
++    try {
++      const rows = 5, cols = 5, lats = [], lons = [];
++      for (let r=0;r<rows;r++) {
++        const lat = bounds.south + (bounds.north-bounds.south) * r/(rows-1);
++        for (let c=0;c<cols;c++) {
++          const lon = bounds.west + (bounds.east-bounds.west) * c/(cols-1);
++          lats.push(lat.toFixed(5)); lons.push(lon.toFixed(5));
++        }
++      }
++      const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + encodeURIComponent(lats.join(',')) +
++        '&longitude=' + encodeURIComponent(lons.join(',')) +
++        '&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=mph&timezone=UTC&forecast_days=1';
++      const resp = await fetch(url);
++      if (!resp.ok) throw new Error('HTTP ' + resp.status);
++      let data = await resp.json();
++      if (!Array.isArray(data)) data = [data];
++      if (data.length < rows*cols) throw new Error('Incomplete wind grid');
++      const samples = data.slice(0,rows*cols).map(item => {
++        const cur = item && item.current ? item.current : {};
++        const vec = windVector(cur.wind_speed_10m, cur.wind_direction_10m);
++        vec.gust = Number(cur.wind_gusts_10m);
++        return vec;
++      });
++      windGrid = { rows, cols, south:bounds.south, north:bounds.north, west:bounds.west, east:bounds.east, samples };
++      windLastFetch = Date.now();
++      resetWindParticles();
++      const center = map ? map.getCenter() : currentLoc;
++      const w = center ? windAt(center.lat, center.lng != null ? center.lng : center.lon) : null;
++      const centerIndex = Math.floor((rows*cols)/2);
++      const centerSample = samples[centerIndex] || null;
++      const speed = w ? w.speed : (centerSample ? centerSample.speed : 0);
++      const from = centerSample ? centerSample.from : null;
++      const gust = centerSample && Number.isFinite(centerSample.gust) ? centerSample.gust : null;
++      const label = Math.round(speed) + ' mph' + (from != null ? ' ' + compassNameFromWind(from) : '') + (gust != null ? ' • gust ' + Math.round(gust) : '');
++      $('windChipText').textContent = 'Wind ' + label;
++      $('windChip').style.display = windEnabled ? 'block' : 'none';
++      if ($('quickWindStatus')) $('quickWindStatus').innerHTML = '<strong>Modeled wind:</strong> ' + escapeHtml(label) + '<br>Animated 10 m wind field • Open-Meteo data.';
++    } catch (e) {
++      windGrid = null;
++      if ($('quickWindStatus')) $('quickWindStatus').textContent = 'Wind layer unavailable: ' + (e.message || e);
++      $('windChipText').textContent = 'Wind unavailable';
++    } finally {
++      windLoading = false;
++    }
++  }
++
++  function resizeWindCanvas() {
++    const canvas = $('windCanvas');
++    if (!canvas) return null;
++    const rect = canvas.getBoundingClientRect();
++    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
++    const w = Math.max(1, Math.round(rect.width * dpr)), h = Math.max(1, Math.round(rect.height * dpr));
++    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
++    const ctx = canvas.getContext('2d');
++    ctx.setTransform(dpr,0,0,dpr,0,0);
++    return { canvas, ctx, width:rect.width, height:rect.height };
++  }
++
++  function resetWindParticle(p) {
++    const g = windGrid;
++    if (!g) return;
++    p.lat = g.south + Math.random() * (g.north-g.south);
++    p.lon = g.west + Math.random() * (g.east-g.west);
++    p.age = Math.floor(Math.random()*90);
++    p.maxAge = 70 + Math.floor(Math.random()*90);
++    p.prev = null;
++  }
++
++  function resetWindParticles() {
++    windParticles = [];
++    if (!windGrid) return;
++    const count = 115;
++    for (let i=0;i<count;i++) { const p={}; resetWindParticle(p); windParticles.push(p); }
++  }
++
++  function animateWind() {
++    cancelAnimationFrame(windAnimationFrame);
++    let last = performance.now();
++    const frame = now => {
++      if (!windEnabled) return;
++      const view = resizeWindCanvas();
++      if (!view || !map || !windGrid) { windAnimationFrame=requestAnimationFrame(frame); return; }
++      const dt = Math.min(0.08, Math.max(0.012, (now-last)/1000)); last=now;
++      const {ctx,width,height}=view;
++      ctx.clearRect(0,0,width,height);
++      ctx.lineWidth = 1.35;
++      ctx.lineCap = 'round';
++      const exaggeration = 5.0;
++      windParticles.forEach(p => {
++        const vec = windAt(p.lat,p.lon);
++        if (!vec || p.age++ > p.maxAge) { resetWindParticle(p); return; }
++        const start = map.latLngToContainerPoint([p.lat,p.lon]);
++        const metersEast = vec.u * 0.44704 * dt * exaggeration;
++        const metersNorth = vec.v * 0.44704 * dt * exaggeration;
++        p.lat += metersNorth / 111320;
++        p.lon += metersEast / (111320 * Math.max(.25, Math.cos(p.lat*Math.PI/180)));
++        const end = map.latLngToContainerPoint([p.lat,p.lon]);
++        if (end.x < -30 || end.x > width+30 || end.y < -30 || end.y > height+30 || p.lat<windGrid.south || p.lat>windGrid.north || p.lon<windGrid.west || p.lon>windGrid.east) { resetWindParticle(p); return; }
++        const alpha = Math.max(.25, Math.min(.86, .28 + vec.speed/35));
++        ctx.strokeStyle = 'rgba(8,116,164,' + alpha.toFixed(2) + ')';
++        ctx.beginPath(); ctx.moveTo(start.x,start.y); ctx.lineTo(end.x,end.y); ctx.stroke();
++      });
++      windAnimationFrame = requestAnimationFrame(frame);
++    };
++    windAnimationFrame = requestAnimationFrame(frame);
++  }
++
++  function toggleWindOverlay(on) {
++    windEnabled = !!on;
++    localStorage.setItem(STORAGE_WIND, windEnabled ? '1' : '0');
++    if ($('windToggle')) $('windToggle').checked = windEnabled;
++    if ($('quickWindToggle')) $('quickWindToggle').checked = windEnabled;
++    $('windCanvas').style.display = windEnabled ? 'block' : 'none';
++    $('windChip').style.display = windEnabled ? 'block' : 'none';
++    if (!windEnabled) {
++      cancelAnimationFrame(windAnimationFrame);
++      const view = resizeWindCanvas(); if (view) view.ctx.clearRect(0,0,view.width,view.height);
++      if ($('quickWindStatus')) $('quickWindStatus').textContent = 'Wind overlay off. Auto heading uses GPS course when moving and the true compass when slow/stopped.';
++      return;
++    }
++    if (offlineMode) {
++      if ($('quickWindStatus')) $('quickWindStatus').textContent = 'Wind animation needs data service. It is disabled while Offline mode is active.';
++      return;
++    }
++    loadWindField(true);
++    animateWind();
++  }
++
+   function clearOfflineImageLayer() {
+     if (map && offlineImageLayer) {
+       try { map.removeLayer(offlineImageLayer); } catch (e) {}
+@@ -1344,6 +1667,9 @@ html, body {
+         if (hazardLayer && map.hasLayer(hazardLayer)) map.removeLayer(hazardLayer);
+       }
+       $('noaaChartToggle').checked = false;
++      cancelAnimationFrame(windAnimationFrame);
++      $('windCanvas').style.display = 'none';
++      $('windChip').style.display = 'none';
+       $('chartChip').textContent = 'OFFLINE saved lake map';
+       $('map').style.background = '#b9d5df';
+     } else {
+@@ 
