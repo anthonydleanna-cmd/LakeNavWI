@@ -1,0 +1,155 @@
+ss="tool" id="centerBtn"><span class="glyph">GPS</span>Center</button>
+-    <button class="tool" id="markBtn"><span class="glyph">+</span>Mark GPS</button>
+-    <button class="tool" id="searchBtn"><span class="glyph">? </span>Lake Search</button>
+-    <button class="tool" id="waypointsBtn"><span class="glyph">WP</span>Waypoints</button>
+-    <button class="tool" id="trackBtn"><span class="glyph">REC</span>Track</button>
+-    <button class="tool" id="moreBtn"><span class="glyph">...</span>More</button>
++  <div id="toolbar" aria-label="Main navigation">
++    <button class="tool" id="centerBtn" aria-label="Center on GPS"><span class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="5"/></svg></span><span>Center</span></button>
++    <button class="tool" id="markBtn" aria-label="Mark current GPS"><span class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"/><path d="M12 7v6M9 10h6"/></svg></span><span>Mark</span></button>
++    <button class="tool primaryTool" id="searchBtn" aria-label="Search lakes"><span class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/></svg></span><span>Lakes</span></button>
++    <button class="tool" id="waypointsBtn" aria-label="Waypoints"><span class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v18M7 5h10l-3 4 3 4H7"/></svg></span><span>Waypoints</span></button>
++    <button class="tool" id="trackBtn" aria-label="Track recording"><span class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="17" r="2"/><circle cx="18" cy="7" r="2"/><path d="M8 16c3-1 3-7 7-8"/></svg></span><span>Track</span></button>
++    <button class="tool" id="moreBtn" aria-label="More tools"><span class="glyph"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></span><span>More</span></button>
+   </div>
+ </div>
+ 
+@@ -392,6 +540,9 @@
+   let nativeMagneticHeading = null;
+   let nativeDeclination = 0;
+   let nativeHeadingAccuracy = -1;
++  let renderedHeading = null;
++  let lastRenderedHeadingAt = 0;
++  let gpsBearingAccuracy = null;
+   let currentLoc = null;
+   let firstFix = true;
+   let addMode = false;
+@@ -507,7 +658,7 @@
+     return L.divIcon({
+       className: 'boatMarker',
+       iconSize: [38, 44],
+-      iconAnchor: [19, 22],
++      iconAnchor: [19, 25],
+       html: '<div class="boatArrow"><svg viewBox="0 0 38 44" aria-hidden="true"><path d="M19 2 L35 40 L19 33 L3 40 Z" fill="#087cb8" stroke="#ffffff" stroke-width="3" stroke-linejoin="round"/><circle cx="19" cy="25" r="3.4" fill="#ffffff"/></svg></div>'
+     });
+   }
+@@ -521,9 +672,10 @@
+   function activeHeading() {
+     const gpsBearing = currentLoc && Number.isFinite(Number(currentLoc.bearing)) && Number(currentLoc.bearing) >= 0 ? normalizeDegrees(currentLoc.bearing) : null;
+     const speed = currentLoc && Number.isFinite(Number(currentLoc.speed)) ? Number(currentLoc.speed) : -1;
+-    if (gpsBearing != null && speed >= 1.25) return { degrees: gpsBearing, source: 'GPS course' };
++    const gpsCourseTrusted = gpsBearing != null && speed >= 1.8 && (gpsBearingAccuracy == null || gpsBearingAccuracy < 35);
++    if (gpsCourseTrusted) return { degrees: gpsBearing, source: 'GPS course' };
+     if (nativeTrueHeading != null) return { degrees: normalizeDegrees(nativeTrueHeading), source: 'True compass' };
+-    if (gpsBearing != null) return { degrees: gpsBearing, source: 'GPS course' };
++    if (gpsBearing != null && speed >= 1.2) return { degrees: gpsBearing, source: 'GPS course' };
+     return null;
+   }
+ 
+@@ -533,16 +685,36 @@
+     return diff;
+   }
+ 
++  function smoothDisplayHeading(rawDeg, source) {
++    if (rawDeg == null) return null;
++    const now = Date.now();
++    if (renderedHeading == null || !Number.isFinite(renderedHeading)) {
++      renderedHeading = normalizeDegrees(rawDeg);
++      lastRenderedHeadingAt = now;
++      return renderedHeading;
++    }
++    let delta = shortestSignedAngle(renderedHeading, rawDeg);
++    const deadband = source === 'GPS course' ? 1.0 : 2.2;
++    if (Math.abs(delta) < deadband) return renderedHeading;
++
++    // The phone compass can jump indoors or near metal. Limit how much one sample can move the visual arrow.
++    const maxStep = source === 'GPS course' ? 18 : 8;
++    delta = Math.max(-maxStep, Math.min(maxStep, delta));
++    const alpha = source === 'GPS course' ? 0.34 : 0.18;
++    renderedHeading = normalizeDegrees(renderedHeading + delta * alpha);
++    lastRenderedHeadingAt = now;
++    return renderedHeading;
++  }
++
+   function updateOrientationButton() {
+     $('orientationBtn').textContent = orientationMode === 'courseup' ? 'COURSE UP' : 'NORTH UP';
+     $('orientationBtn').setAttribute('aria-label', orientationMode === 'courseup' ? 'Course-up display active. Tap to switch to north-up.' : 'North-up display active. Tap to switch to course-up.');
+   }
+ 
+-  function applyMapOrientation() {
+-    const h = activeHeading();
+-    const target = orientationMode === 'courseup' && h ? h.degrees : 0;
++  function applyMapOrientationWithHeading(displayHeading) {
++    const target = orientationMode === 'courseup' && displayHeading != null ? displayHeading : 0;
+     const delta = shortestSignedAngle(mapRotationDeg, target);
+-    mapRotationDeg = normalizeDegrees(mapRotationDeg + delta * 0.32) || 0;
++    mapRotationDeg = normalizeDegrees(mapRotationDeg + delta * 0.18) || 0;
+     const visualAngle = orientationMode === 'courseup' ? mapRotationDeg : 0;
+     const scale = visualAngle ? 1.12 : 1;
+     $('map').style.transform = visualAngle ? 'rotate(' + (-visualAngle).toFixed(1) + 'deg) scale(' + scale.toFixed(2) + ')' : 'none';
+@@ -550,6 +722,12 @@
+     updateOrientationButton();
+   }
+ 
++  function applyMapOrientation() {
++    const h = activeHeading();
++    const deg = h ? smoothDisplayHeading(h.degrees, h.source) : null;
++    applyMapOrientationWithHeading(deg);
++  }
++
+   function toggleOrientationMode() {
+     orientationMode = orientationMode === 'courseup' ? 'northup' : 'courseup';
+     const h = activeHeading();
+@@ -561,11 +739,12 @@
+ 
+   function updateHeadingVisuals() {
+     const h = activeHeading();
+-    const deg = h ? h.degrees : null;
++    const rawDeg = h ? h.degrees : null;
++    const deg = h ? smoothDisplayHeading(rawDeg, h.source) : null;
+     $('headingValue').textContent = deg == null ? '--' : Math.round(deg) + '°';
+     $('compassText').textContent = deg == null ? '--°' : Math.round(deg) + '° ' + cardinal(deg);
+     let source = h ? h.source : 'heading';
+-    if (h && h.source === 'True compass' && nativeHeadingAccuracy === 0) source = 'calibrate compass';
++    if (h && h.source === 'True compass' && nativeHeadingAccuracy >= 0 && nativeHeadingAccuracy <= 1) source = 'calibrate compass';
+     $('compassSource').textContent = source;
+     $('compassNeedle').style.transform = 'rotate(' + (deg == null ? 0 : deg) + 'deg)';
+ 
+@@ -577,7 +756,7 @@
+     const fallback = $('fallbackGps');
+     if (fallback) fallback.style.transform = 'rotate(' + (deg == null ? 0 : deg) + 'deg)';
+     updateHeadingLine(deg);
+-    applyMapOrientation();
++    applyMapOrientationWithHeading(deg);
+   }
+ 
+   function destinationPoint(lat, lon, bearing, distanceM) {
+@@ -633,8 +812,9 @@
+     });
+   }
+ 
+-  window.onNativeLocation = function (lat, lon, accuracy, speed, bearing, timestamp) {
+-    currentLoc = { lat, lon, accuracy, speed, bearing, timestamp };
++  window.onNativeLocation = function (lat, lon, accuracy, speed, bearing, timestamp, bearingAccuracy) {
++    gpsBearingAccuracy = Number.isFinite(Number(bearingAccuracy)) && Number(bearingAccuracy) >= 0 ? Number(bearingAccuracy) : null;
++    currentLoc = { lat, lon, accuracy, speed, bearing, timestamp, bearingAccuracy: gpsBearingAccuracy };
+     updateOfflineFallbackGps();
+ 
+     $('gpsState').textContent = lat.toFixed(5) + ', ' + lon.toFixed(5) + (bearing >= 0 ? ' | ' + Math.round(bearing) + ' deg' : '');
+@@ -685,7 +865,8 @@
+   function setRecording(on) {
+     recording = on;
+     $('trackBtn').classList.toggle('recording', on);
+-    $('trackBtn').querySelector('.glyph').textContent = on ? 'STOP' : 'REC';
++    const trackLabel = $('trackBtn').lastElementChild;
++    if (trackLabel) trackLabel.textContent = on ? 'Stop' : 'Track';
+     $('trackChip').style.display = on ? 'block' : 'none';
+     if (window.Android && Android.keepScreenOn) Android.keepScreenOn(on || !!targetId);
+     if (window.Android && Android.toast) Android.toast(on ? 'Track recording started' : 'Track recording stopped');
+--- a/app/src/main/java/com/lakenav/wi/MainActivity.java
++++ b/app/src/main/java/com/lakenav/wi/MainActivity.java
+@@ -54,7 +54,7 @@
+     private static final int REQ_LOCATION = 1001;
+     private static final int REQ_EXPORT_GPX = 2001;
+     private static final int REQ_IMPORT_GPX = 2002;
+-    private s
