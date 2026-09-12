@@ -1,0 +1,144 @@
+diff --git a/README.md b/README.md
+index a84bb01..eb0da9b 100644
+--- a/README.md
++++ b/README.md
+@@ -2,9 +2,28 @@
+ 
+ LakeNav WI is a personal Android lake-navigation prototype focused on Wisconsin inland lakes and Great Lakes use.
+ 
+-## Version 0.5 features
++## Version 0.6 features
+ 
+-Version 0.5 keeps the v0.4 navigation, bathymetry, hazard, offline-lake, waypoint, GPS tracking, weather, and DNR features while focusing on a more current 2026-style interface and calmer heading behavior.
++Version 0.6 builds on the v0.5 interface and heading improvements with a selectable Auto / GPS Course / Compass heading source, a quick map-layer popover, and an animated wind field overlay for rapid weather awareness.
++
++
++### Quick map layers
++- Adds a floating Layers control directly on the map.
++- Quickly toggles NOAA chart display, NOAA depth colors, hazards/nav aids, and animated wind without opening the full Lake Tools sheet.
++- Keeps the existing full settings available for longer-form controls.
++
++### Heading source selector
++- Adds **Auto**, **GPS**, and **Compass** modes.
++- Auto is recommended: it prefers GPS course-over-ground once movement and bearing accuracy are good enough, otherwise it uses the phone true-heading compass.
++- GPS mode intentionally waits for adequate movement instead of treating a stationary GPS bearing as real heading.
++- Compass mode forces the phone true-heading compass for stationary testing and calibration.
++
++### Animated wind overlay
++- Samples modeled current 10-meter wind across the visible map and animates particles in the wind-flow direction.
++- Uses Open-Meteo data in the personal/non-commercial test build and shows a current modeled wind speed/direction summary.
++- Refreshes when the map is moved far enough or after the cached wind field ages.
++- Requires data service and is disabled in LakeNav Offline mode.
++- This is forecast/model guidance, not a replacement for local observations or an onboard anemometer.
+ 
+ ### 2026 interface refresh
+ - Reworks the top status area, map chips, compass, bottom navigation dock, cards, buttons, search controls, and bottom sheets with a cleaner modern visual system.
+@@ -130,7 +149,7 @@ This repository includes `.github/workflows/build-apk.yml`.
+ 1. Put the project in a GitHub repository.
+ 2. Open the repository Actions tab.
+ 3. Run the `Build Android APK` workflow, or push to the main branch.
+-4. Download the `LakeNavWI-v0.5-debug-apk` artifact from the completed workflow.
++4. Download the `LakeNavWI-v0.6-debug-apk` artifact from the completed workflow.
+ 5. On the Android phone, allow installation from the app used to open the APK, then install `app-debug.apk`.
+ 
+ ## Online data/services used
+diff --git a/app/build.gradle b/app/build.gradle
+index a8fe249..4c60b84 100644
+--- a/app/build.gradle
++++ b/app/build.gradle
+@@ -10,8 +10,8 @@ android {
+         applicationId 'com.lakenav.wi'
+         minSdk 26
+         targetSdk 35
+-        versionCode 5
+-        versionName '0.5.0'
++        versionCode 6
++        versionName '0.6.0'
+     }
+ 
+     buildTypes {
+diff --git a/app/src/main/assets/index.html b/app/src/main/assets/index.html
+index d1093d1..58b8094 100644
+--- a/app/src/main/assets/index.html
++++ b/app/src/main/assets/index.html
+@@ -306,6 +306,40 @@ html, body {
+   .sheet { border-radius: 28px 28px 20px 20px; margin-bottom:18px; }
+ }
+ 
++/* v0.6 quick layers + animated wind */
++#layersQuickBtn { left: 12px; top: 12px; min-height: 38px; padding: 8px 12px; display:flex; align-items:center; gap:7px; }
++#layersQuickBtn svg { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
++#layersQuickPanel {
++  position:absolute; left:12px; top:58px; z-index:960; width:min(310px,calc(100% - 24px)); display:none;
++  background:rgba(252,254,255,.96); border:1px solid rgba(255,255,255,.8); border-radius:22px;
++  box-shadow:0 16px 42px rgba(4,35,52,.24); backdrop-filter:blur(22px) saturate(155%);
++  -webkit-backdrop-filter:blur(22px) saturate(155%); padding:12px;
++}
++#layersQuickPanel.open { display:block; animation:quickLayerIn .16s ease-out; }
++@keyframes quickLayerIn { from { opacity:0; transform:translateY(-5px) scale(.985); } to { opacity:1; transform:none; } }
++.quickTitle { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 7px; }
++.quickTitle strong { font-size:15px; letter-spacing:-.01em; }
++.quickLayerRow { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:44px; padding:7px 4px; border-bottom:1px solid rgba(22,60,80,.07); }
++.quickLayerRow:last-of-type { border-bottom:0; }
++.quickLayerText { display:flex; flex-direction:column; gap:2px; font-size:13px; font-weight:750; }
++.quickLayerText small { color:var(--muted); font-size:10px; font-weight:600; }
++.toggleSwitch { position:relative; width:46px; height:27px; flex:0 0 auto; }
++.toggleSwitch input { position:absolute; opacity:0; pointer-events:none; }
++.toggleSwitch span { position:absolute; inset:0; border-radius:999px; background:#dbe6eb; box-shadow:inset 0 0 0 1px rgba(17,54,74,.08); transition:.18s ease; }
++.toggleSwitch span::after { content:''; position:absolute; width:21px; height:21px; border-radius:50%; left:3px; top:3px; background:white; box-shadow:0 2px 6px rgba(0,0,0,.18); transition:.18s ease; }
++.toggleSwitch input:checked + span { background:#1192c7; }
++.toggleSwitch input:checked + span::after { transform:translateX(19px); }
++.headingModeLabel { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin:10px 3px 6px; }
++.headingModeControl { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; padding:4px; border-radius:16px; background:#edf4f7; }
++.headingModeControl button { border:0; min-height:36px; border-radius:12px; background:transparent; color:#36515f; font-size:11px; font-weight:800; }
++.headingModeControl button.active { background:white; color:#087bb1; box-shadow:0 2px 10px rgba(7,60,89,.12); }
++#windCanvas { position:absolute; inset:0; width:100%; height:100%; z-index:640; pointer-events:none; transform-origin:50% 50%; transition:transform .34s cubic-bezier(.22,.61,.36,1); }
++#windChip { right:12px; bottom:12px; display:none; max-width:220px; }
++#trackChip { top:58px; }
++#selectedLakeChip { top:102px; max-width:260px; }
++.windStatusDot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#13a2cc; margin-right:5px; box-shadow:0 0 0 3px rgba(19,162,204,.14); }
++#quickWindStatus { margin-top:8px; padding:8px 9px; border-radius:14px; background:#edf7fb; font-size:10px; color:#47606d; line-height:1.35; }
++
+ </style>
+ <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" onerror="window.leafletFailed=true"></script>
+ </head>
+@@ -313,7 +347,7 @@ html, body {
+ <div id="app">
+   <div id="statusbar">
+     <div>
+-      <div id="brand">LakeNav WI <span class="versionPill">v0.5</span></div>
++      <div id="brand">LakeNav WI <span class="versionPill">v0.6</span></div>
+       <div id="gpsState">Waiting for GPS...</div>
+     </div>
+     <div id="gpsNumbers">
+@@ -332,6 +366,7 @@ html, body {
+ 
+   <div id="mapWrap">
+     <div id="map"></div>
++    <canvas id="windCanvas" aria-hidden="true"></canvas>
+     <div id="offlineFallback">
+       <img id="offlineMapImage" alt="Saved offline Wisconsin DNR lake map" />
+       <svg id="fallbackVector" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true">
+@@ -348,6 +383,17 @@ html, body {
+     </div>
+     <div id="trackChip" class="map-chip">Track: <strong id="trackDistance">0.00 mi</strong></div>
+     <div id="chartChip" class="map-chip">OSM map</div>
++    <button id="layersQuickBtn" class="map-chip chipBtn" aria-label="Open map layers"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3.5 7.5 12 12l8.5-4.5L12 3Z"/><path d="m5.5 11 6.5 3.5 6.5-3.5"/><path d="m5.5 15 6.5 3.5 6.5-3.5"/></svg><span>Layers</span></button>
++    <div id="layersQuickPanel" role="dialog" aria-label="Quick map layers">
++      <div class="quickTitle"><strong>Map layers</strong><button class="closeBtn" id="quickLayersClose" aria-label="Close layers">x</button></div>
++      <div class="quickLayerRow"><div class="quickLayerText">NOAA chart<small>Great Lakes + charted waters</small></div><label class="toggleSwitch"><input type="checkbox" id="quickNoaaToggle"><span></span></label></div>
++      <div class="quickLayerRow"><div class="quickLayerText">Depth colors<small>NOAA ENC bathymetry</small></div><label class="toggleSwitch"><input type="checkbox" id="quickDepthToggle"><span></span></label></div>
++      <div class="quickLayerRow"><div class="quickLayerText">Hazards + aids<small>Buoys, beacons, seamarks</small></div><label class="toggleSwitch"><input type="checkbox" id="quickHazardToggle"><span></span></label></div>
++      <div class="quickLayerRow"><div class="quickLayerText">Animated wind<small>Modeled 10 m wind around the map</small></div><label class="toggleSwitch"><input type="checkbox" id="quickWindToggle"><span></span></label></div>
++      <div class="headingModeLabel">Heading source</div>
++      <div class="headingModeControl" id="headingModeControl"><button data-heading-mode="auto">AUTO</button><button data-heading-mode="gps">GPS</button><button data-heading-mode="compass">COMPASS</button></div>
++      <div id="quickWindStatus">Wind overlay off. Auto heading uses GPS course when moving and the true compass when slow/stopped.</div>
++    </div>
+     <div id="compassHud" aria-label="Heading compass">
+       <div id="compassDial"><span class="north">N</span><div id="compassNeedle"></div></div>
+       <div id="compassText">--°</div>
+@@ -365,6 +411,7 @@ html, body {
+     <div id="selectedLakeChip" class="map-chip">Lake: <strong id="selectedLakeChipName">--</strong></div>
+     <button id="orientationBtn" class="map-chip chipBtn">NORTH UP</button>
+     <div id="tapChip" class="map-chip">Tap the map to add a waypoint</div>
++    <div id="windChip" cl
