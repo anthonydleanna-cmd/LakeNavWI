@@ -1,0 +1,184 @@
+ass="map-chip"><span class="windStatusDot"></span><span id="windChipText">Wind --</span></div>
+   </div>
+ 
+   <div id="toolbar" aria-label="Main navigation">
+@@ -456,7 +503,17 @@ html, body {
+         <label class="switchLine"><input type="checkbox" id="hazardToggle" /> Hazards + nav aids</label>
+         <span class="muted">Marine symbols</span>
+       </div>
+-      <div class="warn">Depth colors use NOAA ENC depth-area polygons where coverage exists, and LakeNav now adds depth labels for the charted minimum depth in each visible area at higher zoom levels. Hazards + nav aids adds a seamark-symbol overlay for buoys, beacons, and common marine features where coverage exists. Most inland Wisconsin lakes still rely on the DNR reference contour sheet because those scans are not safely GPS-aligned.</div>
++      <div class="row">
++        <label class="switchLine"><input type="checkbox" id="windToggle" /> Animated wind</label>
++        <span class="muted">Open-Meteo model</span>
++      </div>
++      <div class="warn">Depth colors use NOAA ENC depth-area polygons where coverage exists, and LakeNav now adds depth labels for the charted minimum depth in each visible area at higher zoom levels. Hazards + nav aids adds a seamark-symbol overlay for buoys, beacons, and common marine features where coverage exists. Animated wind samples current 10 m model wind around the visible map and draws a moving particle field; it is forecast/model guidance, not an on-water anemometer. Most inland Wisconsin lakes still rely on the DNR reference contour sheet because those scans are not safely GPS-aligned.</div>
++    </div>
++
++    <div class="card">
++      <h3>Heading source</h3>
++      <div class="headingModeControl" id="headingModeControlMore"><button data-heading-mode="auto">AUTO</button><button data-heading-mode="gps">GPS</button><button data-heading-mode="compass">COMPASS</button></div>
++      <div class="muted" style="margin-top:8px">Auto is recommended: GPS course is used when moving fast enough for a stable course; the phone true-heading compass is used while slow or stopped. Forced GPS intentionally waits for movement instead of pretending a stationary GPS bearing is reliable.</div>
+     </div>
+ 
+     <div class="card">
+@@ -510,6 +567,8 @@ html, body {
+   const STORAGE_ORIENTATION = 'lakenav.orientation.v1';
+   const STORAGE_HAZARDS = 'lakenav.hazards.v1';
+   const STORAGE_DEPTH_SHADE = 'lakenav.depthshade.v1';
++  const STORAGE_HEADING_MODE = 'lakenav.headingmode.v1';
++  const STORAGE_WIND = 'lakenav.wind.v1';
+   const SEAMARK_TILE_URL = 'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png';
+   const NOAA_DEPTH_SOURCES = [
+     { minZoom: 15, name: 'Berthing', url: 'https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_berthing/MapServer/100/query' },
+@@ -533,6 +592,14 @@ html, body {
+   let depthShadeEnabled = localStorage.getItem(STORAGE_DEPTH_SHADE) === '1';
+   let hazardLayerEnabled = localStorage.getItem(STORAGE_HAZARDS) === '1';
+   let orientationMode = localStorage.getItem(STORAGE_ORIENTATION) === 'courseup' ? 'courseup' : 'northup';
++  let headingMode = ['auto','gps','compass'].includes(localStorage.getItem(STORAGE_HEADING_MODE)) ? localStorage.getItem(STORAGE_HEADING_MODE) : 'auto';
++  let windEnabled = localStorage.getItem(STORAGE_WIND) === '1';
++  let windGrid = null;
++  let windParticles = [];
++  let windAnimationFrame = 0;
++  let windFetchTimer = null;
++  let windLastFetch = 0;
++  let windLoading = false;
+   let depthShadeRequest = 0;
+   let depthShadeTimer = null;
+   let mapRotationDeg = 0;
+@@ -629,13 +696,18 @@ html, body {
+       addWaypointAt(e.latlng.lat, e.latlng.lng, 'Waypoint');
+     });
+     map.on('moveend zoomend', scheduleDepthShadeRefresh);
++    map.on('moveend zoomend', scheduleWindRefresh);
+ 
+     if (hazardLayerEnabled) toggleHazards(true);
+     $('depthShadeToggle').checked = depthShadeEnabled;
++    if ($('quickDepthToggle')) $('quickDepthToggle').checked = depthShadeEnabled;
+     $('hazardToggle').checked = hazardLayerEnabled;
++    syncLayerControls();
++    updateHeadingModeUi();
+     updateOrientationButton();
+     applyMapOrientation();
+     if (depthShadeEnabled) scheduleDepthShadeRefresh();
++    if (windEnabled) toggleWindOverlay(true);
+ 
+     renderWaypointMarkers();
+     updateTrackUi();
+@@ -669,16 +741,47 @@ html, body {
+     return ((n % 360) + 360) % 360;
+   }
+ 
+-  function activeHeading() {
++  function headingInputs() {
+     const gpsBearing = currentLoc && Number.isFinite(Number(currentLoc.bearing)) && Number(currentLoc.bearing) >= 0 ? normalizeDegrees(currentLoc.bearing) : null;
+     const speed = currentLoc && Number.isFinite(Number(currentLoc.speed)) ? Number(currentLoc.speed) : -1;
+-    const gpsCourseTrusted = gpsBearing != null && speed >= 1.8 && (gpsBearingAccuracy == null || gpsBearingAccuracy < 35);
+-    if (gpsCourseTrusted) return { degrees: gpsBearing, source: 'GPS course' };
+-    if (nativeTrueHeading != null) return { degrees: normalizeDegrees(nativeTrueHeading), source: 'True compass' };
+-    if (gpsBearing != null && speed >= 1.2) return { degrees: gpsBearing, source: 'GPS course' };
++    const gpsTrusted = gpsBearing != null && speed >= 1.8 && (gpsBearingAccuracy == null || gpsBearingAccuracy < 35);
++    const gpsUsable = gpsBearing != null && speed >= 1.2 && (gpsBearingAccuracy == null || gpsBearingAccuracy < 50);
++    const compass = nativeTrueHeading != null ? normalizeDegrees(nativeTrueHeading) : null;
++    return { gpsBearing, speed, gpsTrusted, gpsUsable, compass };
++  }
++
++  function activeHeading() {
++    const h = headingInputs();
++    if (headingMode === 'gps') {
++      if (h.gpsUsable) return { degrees: h.gpsBearing, source: 'GPS course' };
++      return null;
++    }
++    if (headingMode === 'compass') {
++      return h.compass != null ? { degrees: h.compass, source: 'True compass' } : null;
++    }
++    if (h.gpsTrusted) return { degrees: h.gpsBearing, source: 'GPS course' };
++    if (h.compass != null) return { degrees: h.compass, source: 'True compass' };
++    if (h.gpsUsable) return { degrees: h.gpsBearing, source: 'GPS course' };
+     return null;
+   }
+ 
++  function setHeadingMode(mode) {
++    if (!['auto','gps','compass'].includes(mode)) mode = 'auto';
++    headingMode = mode;
++    renderedHeading = null;
++    localStorage.setItem(STORAGE_HEADING_MODE, mode);
++    updateHeadingModeUi();
++    updateHeadingVisuals();
++    if (window.Android && Android.toast) {
++      const label = mode === 'auto' ? 'Auto heading' : (mode === 'gps' ? 'GPS course heading' : 'Compass heading');
++      Android.toast(label + ' selected');
++    }
++  }
++
++  function updateHeadingModeUi() {
++    document.querySelectorAll('[data-heading-mode]').forEach(btn => btn.classList.toggle('active', btn.dataset.headingMode === headingMode));
++  }
++
+   function shortestSignedAngle(fromDeg, toDeg) {
+     let diff = ((toDeg - fromDeg + 540) % 360) - 180;
+     if (diff < -180) diff += 360;
+@@ -719,6 +822,7 @@ html, body {
+     const scale = visualAngle ? 1.12 : 1;
+     $('map').style.transform = visualAngle ? 'rotate(' + (-visualAngle).toFixed(1) + 'deg) scale(' + scale.toFixed(2) + ')' : 'none';
+     $('offlineFallback').style.transform = visualAngle ? 'rotate(' + (-visualAngle).toFixed(1) + 'deg) scale(' + scale.toFixed(2) + ')' : 'none';
++    $('windCanvas').style.transform = visualAngle ? 'rotate(' + (-visualAngle).toFixed(1) + 'deg) scale(' + scale.toFixed(2) + ')' : 'none';
+     updateOrientationButton();
+   }
+ 
+@@ -743,7 +847,7 @@ html, body {
+     const deg = h ? smoothDisplayHeading(rawDeg, h.source) : null;
+     $('headingValue').textContent = deg == null ? '--' : Math.round(deg) + '°';
+     $('compassText').textContent = deg == null ? '--°' : Math.round(deg) + '° ' + cardinal(deg);
+-    let source = h ? h.source : 'heading';
++    let source = h ? h.source : (headingMode === 'gps' ? 'GPS: move to acquire course' : (headingMode === 'compass' ? 'compass unavailable' : 'heading'));
+     if (h && h.source === 'True compass' && nativeHeadingAccuracy >= 0 && nativeHeadingAccuracy <= 1) source = 'calibrate compass';
+     $('compassSource').textContent = source;
+     $('compassNeedle').style.transform = 'rotate(' + (deg == null ? 0 : deg) + 'deg)';
+@@ -1045,9 +1149,11 @@ html, body {
+     if (on) {
+       noaaLayer.addTo(map);
+       $('chartChip').textContent = 'NOAA chart overlay ON';
++      if ($('quickNoaaToggle')) $('quickNoaaToggle').checked = true;
+     } else {
+       map.removeLayer(noaaLayer);
+       $('chartChip').textContent = 'OSM map';
++      if ($('quickNoaaToggle')) $('quickNoaaToggle').checked = false;
+     }
+   }
+ 
+@@ -1139,6 +1245,7 @@ html, body {
+     hazardLayerEnabled = !!on;
+     localStorage.setItem(STORAGE_HAZARDS, hazardLayerEnabled ? '1' : '0');
+     if ($('hazardToggle')) $('hazardToggle').checked = hazardLayerEnabled;
++    if ($('quickHazardToggle')) $('quickHazardToggle').checked = hazardLayerEnabled;
+     if (!map || !hazardLayer) return;
+     if (offlineMode) {
+       if (map.hasLayer(hazardLayer)) map.removeLayer(hazardLayer);
+@@ -1235,6 +1342,222 @@ html, body {
+     scheduleDepthShadeRefresh();
+   }
+ 
++  function syncLayerControls() {
++    const pairs = [
++      ['noaaChartToggle','quickNoaaToggle'],
++      ['depthShadeToggle','quickDepthToggle'],
++      ['hazardToggle','quickHazardToggle'],
++      ['windToggle','quickWindToggle']
++    ];
++    pairs.forEach(pair => {
++      const a = $(pair[0]), b = $(pair[1]);
++      if (a && b) b.checked = a.checked;
++    });
++    if ($('quickDepthToggle')) $('quickDepthToggle').checked = depthShadeEnabled;
++    if ($('quickHazardToggle')) $('quickHazardToggle').checked = hazardLayerEnabled;
++    if ($('windToggle')) $('windToggle').checked = windEnabled;
++    if ($('quickWindToggle')) $('quickWindToggle').checked = windEnabled;
++    updateHeadingModeUi();
++  }
++
++  function closeQuickLayers() {
++    const panel = $('layersQuickPanel');
++    if (panel) panel.classList.remove('open');
++  }
++
++  function toggleQu
