@@ -1,0 +1,181 @@
+--- a/app/src/main/assets/index.html
++++ b/app/src/main/assets/index.html
+@@ -158,6 +158,154 @@
+   #toolbar { width: 560px; align-self: center; border: 1px solid #c5d2d9; border-bottom: 0; border-radius: 14px 14px 0 0; }
+   .sheet { max-width: 640px; margin: 0 auto; }
+ }
++
++
++/* LakeNav WI v0.5 visual refresh — modern glass/navigation UI */
++:root {
++  --navy: #072b46;
++  --blue: #0b7db5;
++  --blue2: #20a8d8;
++  --ice: #eef7fa;
++  --white: #ffffff;
++  --text: #10232f;
++  --muted: #667985;
++  --danger: #d63b32;
++  --ok: #16824b;
++  --surface: rgba(255,255,255,.88);
++  --surfaceStrong: rgba(255,255,255,.96);
++  --hairline: rgba(28,56,72,.10);
++  --shadow: 0 12px 32px rgba(6,37,56,.16), 0 2px 8px rgba(6,37,56,.10);
++  --shadowSoft: 0 6px 20px rgba(6,37,56,.12);
++}
++html, body {
++  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
++  background: #cfe4ec;
++  -webkit-font-smoothing: antialiased;
++}
++#app { background: #cfe4ec; }
++#statusbar {
++  min-height: 70px;
++  background: linear-gradient(135deg, rgba(5,42,68,.98), rgba(7,71,107,.96));
++  padding: max(10px, env(safe-area-inset-top)) 14px 10px;
++  box-shadow: 0 8px 24px rgba(5,42,68,.22);
++  border-bottom: 1px solid rgba(255,255,255,.12);
++}
++#brand { font-size: 19px; letter-spacing: -.02em; display:flex; align-items:center; gap:8px; }
++.versionPill {
++  display:inline-flex; align-items:center; justify-content:center;
++  padding: 3px 7px; border-radius: 999px; font-size: 10px; font-weight: 800;
++  background: rgba(255,255,255,.14); color: rgba(255,255,255,.88); border: 1px solid rgba(255,255,255,.12);
++}
++#gpsState { font-size: 11px; opacity: .76; letter-spacing: .01em; }
++#gpsNumbers { gap: 14px; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; opacity: .92; }
++#gpsNumbers strong { font-size: 17px; letter-spacing: -.02em; text-transform:none; }
++#navPanel {
++  margin: 8px 10px 0;
++  border: 1px solid var(--hairline);
++  border-radius: 18px;
++  background: var(--surfaceStrong);
++  box-shadow: var(--shadowSoft);
++  padding: 10px 12px;
++}
++#navPanel.active { display:grid; }
++#navName { font-size: 15px; letter-spacing: -.01em; }
++.navMetric { font-size: 9px; text-transform: uppercase; letter-spacing: .07em; }
++.navMetric strong { font-size: 17px; }
++#map { transition: transform .34s cubic-bezier(.22,.61,.36,1); }
++#offlineFallback { transition: transform .34s cubic-bezier(.22,.61,.36,1); }
++.map-chip {
++  background: rgba(255,255,255,.88);
++  border: 1px solid rgba(255,255,255,.72);
++  backdrop-filter: blur(18px) saturate(145%);
++  -webkit-backdrop-filter: blur(18px) saturate(145%);
++  border-radius: 999px;
++  box-shadow: var(--shadowSoft);
++  color: #183746;
++  font-weight: 700;
++}
++#compassHud {
++  right: 12px; top: 52px; width: 82px; padding: 7px 6px 6px;
++  border-radius: 22px;
++  background: rgba(255,255,255,.88);
++  border: 1px solid rgba(255,255,255,.72);
++  backdrop-filter: blur(18px) saturate(145%);
++  -webkit-backdrop-filter: blur(18px) saturate(145%);
++  box-shadow: var(--shadow);
++}
++#compassDial { width: 54px; height: 54px; border: 1.5px solid rgba(18,62,84,.34); background: radial-gradient(circle, #fff 0 55%, #edf6f9 56% 100%); }
++#compassNeedle { transition: transform .34s cubic-bezier(.22,.61,.36,1); }
++#compassText { font-size: 13px; letter-spacing: -.02em; }
++#compassSource { font-size: 8px; margin-top:1px; }
++#orientationBtn { right: 12px; top: 146px; min-height: 36px; padding: 8px 12px; font-size: 10px; letter-spacing: .06em; }
++.boatArrow { transition: transform .38s cubic-bezier(.22,.61,.36,1); filter: drop-shadow(0 3px 6px rgba(0,38,62,.34)); }
++#fallbackGps { transition: transform .38s cubic-bezier(.22,.61,.36,1); }
++#toolbar {
++  position: relative;
++  margin: 0;
++  padding: 7px 8px max(8px, env(safe-area-inset-bottom));
++  gap: 4px;
++  background: rgba(250,253,254,.94);
++  border-top: 1px solid rgba(22,58,77,.08);
++  box-shadow: 0 -10px 30px rgba(8,45,65,.11);
++  backdrop-filter: blur(24px) saturate(150%);
++  -webkit-backdrop-filter: blur(24px) saturate(150%);
++}
++.tool {
++  min-height: 58px;
++  border-radius: 17px;
++  font-size: 10px;
++  line-height: 1.05;
++  letter-spacing: -.01em;
++  color: #294655;
++  font-weight: 720;
++  display:flex;
++  flex-direction:column;
++  align-items:center;
++  justify-content:center;
++  gap:4px;
++  transition: transform .14s ease, background .14s ease, color .14s ease, box-shadow .14s ease;
++}
++.tool:active { transform: scale(.95); background: #e8f3f7; }
++.tool .glyph { display:flex; align-items:center; justify-content:center; height:24px; margin:0; }
++.tool .glyph svg { width: 23px; height: 23px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
++.tool.primaryTool { color:#087bb1; background: linear-gradient(180deg,#edfaff,#e4f5fb); box-shadow: inset 0 0 0 1px rgba(17,137,185,.08); }
++.tool.recording { color: #c92d26; background: #fff0ef; }
++.tool.recording .glyph svg circle:first-child { fill:#c92d26; stroke:#c92d26; }
++.sheetBackdrop { background: rgba(4,25,37,.42); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
++.sheet {
++  border-radius: 28px 28px 0 0;
++  padding: 10px 16px max(24px, env(safe-area-inset-bottom));
++  box-shadow: 0 -18px 50px rgba(3,31,48,.24);
++  background: rgba(252,254,255,.98);
++}
++.sheet::before { content:""; display:block; width:42px; height:5px; border-radius:999px; background:#c7d6de; margin:2px auto 12px; }
++.sheetHeader { margin-bottom: 14px; }
++.sheetHeader h2 { font-size: 22px; letter-spacing: -.025em; }
++.closeBtn { width: 38px; height: 38px; border-radius: 14px; background:#edf3f6; color:#274656; font-size:0; position:relative; }
++.closeBtn::before, .closeBtn::after { content:""; position:absolute; width:16px; height:1.8px; background:#35515f; left:11px; top:18px; border-radius:2px; }
++.closeBtn::before { transform:rotate(45deg); }.closeBtn::after { transform:rotate(-45deg); }
++.card { border: 1px solid rgba(25,62,81,.08); border-radius: 20px; padding: 14px; margin: 11px 0; box-shadow: 0 3px 14px rgba(16,55,76,.05); }
++.card h3 { font-size: 16px; letter-spacing: -.015em; }
++.btn { border-radius: 15px; min-height: 46px; padding: 10px 15px; background: linear-gradient(135deg,#063b62,#0b78aa); box-shadow: 0 5px 13px rgba(7,76,111,.18); font-size: 13px; }
++.btn:active { transform: scale(.98); }
++.btn.secondary { background:#edf4f7; color:#214151; box-shadow:none; }
++.btn.danger { background: linear-gradient(135deg,#b52d27,#d7443b); }
++.btn.small { min-height: 38px; border-radius: 13px; }
++.textInput { min-height: 48px; border-radius: 15px; border: 1px solid rgba(26,64,82,.18); background:#f8fbfc; box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
++.row { padding: 11px 2px; border-bottom: 1px solid rgba(23,61,80,.07); }
++.wptItem, .lakeItem { border:1px solid rgba(25,62,81,.08); border-radius:18px; padding:13px; box-shadow:0 2px 10px rgba(15,55,76,.04); }
++.weatherCell { border-radius: 16px; background: #f0f7fa; }
++.warn { border-radius: 16px; }
++#mapError { border-radius: 22px; box-shadow: var(--shadow); }
++.leaflet-control-zoom { border:none !important; box-shadow:var(--shadowSoft) !important; }
++.leaflet-control-zoom a { border:0 !important; background:rgba(255,255,255,.91) !important; color:#183746 !important; }
++.leaflet-control-zoom a:first-child { border-radius:14px 14px 6px 6px !important; }
++.leaflet-control-zoom a:last-child { border-radius:6px 6px 14px 14px !important; }
++@media (min-width: 720px) {
++  #toolbar { width: 620px; align-self:center; border-radius: 22px 22px 0 0; }
++  .sheet { border-radius: 28px 28px 20px 20px; margin-bottom:18px; }
++}
++
+ </style>
+ <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" onerror="window.leafletFailed=true"></script>
+ </head>
+@@ -165,7 +313,7 @@
+ <div id="app">
+   <div id="statusbar">
+     <div>
+-      <div id="brand">LakeNav WI <span style="font-size:11px;opacity:.7">v0.4</span></div>
++      <div id="brand">LakeNav WI <span class="versionPill">v0.5</span></div>
+       <div id="gpsState">Waiting for GPS...</div>
+     </div>
+     <div id="gpsNumbers">
+@@ -196,7 +344,7 @@
+     </div>
+     <div id="mapError">
+       <h3>Online map engine unavailable</h3>
+-      <p class="muted">Open Lake Search and choose a previously saved lake. Version 0.3 stores a Wisconsin DNR map snapshot locally, so the saved lake map and GPS position can still be displayed without network map tiles.</p>
++      <p class="muted">Open Lake Search and choose a previously saved lake. LakeNav stores a Wisconsin DNR map snapshot locally, so the saved lake map and GPS position can still be displayed without network map tiles.</p>
+     </div>
+     <div id="trackChip" class="map-chip">Track: <strong id="trackDistance">0.00 mi</strong></div>
+     <div id="chartChip" class="map-chip">OSM map</div>
+@@ -219,13 +367,13 @@
+     <div id="tapChip" class="map-chip">Tap the map to add a waypoint</div>
+   </div>
+ 
+-  <div id="toolbar">
+-    <button cla
