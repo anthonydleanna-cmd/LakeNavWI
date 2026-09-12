@@ -1,0 +1,151 @@
+tatic final String APP_UA = "LakeNavWI/0.3 (+personal Android lake navigation prototype)";
++    private static final String APP_UA = "LakeNavWI/0.5 (+personal Android lake navigation prototype)";
+ 
+     private WebView webView;
+     private LocationManager locationManager;
+@@ -68,6 +68,7 @@
+     private boolean haveAccel = false;
+     private boolean haveMagnetic = false;
+     private float smoothedTrueHeading = Float.NaN;
++    private float lastEmittedHeading = Float.NaN;
+     private long lastHeadingEmitMs = 0L;
+     private String pendingExportName;
+     private String pendingExportContent;
+@@ -103,7 +104,7 @@
+         settings.setAllowFileAccessFromFileURLs(true);
+         settings.setAllowUniversalAccessFromFileURLs(true);
+         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+-        settings.setUserAgentString(settings.getUserAgentString() + " LakeNavWI/0.3");
++        settings.setUserAgentString(settings.getUserAgentString() + " LakeNavWI/0.5");
+ 
+         webView.setWebChromeClient(new WebChromeClient());
+         webView.setWebViewClient(new WebViewClient());
+@@ -162,11 +163,12 @@
+         final float accuracy = location.hasAccuracy() ? location.getAccuracy() : -1f;
+         final float speed = location.hasSpeed() ? location.getSpeed() : -1f;
+         final float bearing = location.hasBearing() ? location.getBearing() : -1f;
++        final float bearingAccuracy = location.hasBearingAccuracy() ? location.getBearingAccuracyDegrees() : -1f;
+         final long time = location.getTime();
+ 
+         String js = String.format(Locale.US,
+-                "window.onNativeLocation && window.onNativeLocation(%.8f,%.8f,%.2f,%.3f,%.2f,%d);",
+-                lat, lon, accuracy, speed, bearing, time);
++                "window.onNativeLocation && window.onNativeLocation(%.8f,%.8f,%.2f,%.3f,%.2f,%d,%.2f);",
++                lat, lon, accuracy, speed, bearing, time, bearingAccuracy);
+         evaluateJavascript(js);
+     }
+ 
+@@ -174,10 +176,10 @@
+         if (sensorManager == null) return;
+         try {
+             if (rotationVectorSensor != null) {
+-                sensorManager.registerListener(this, rotationVectorSensor, SensorManager.SENSOR_DELAY_GAME);
++                sensorManager.registerListener(this, rotationVectorSensor, SensorManager.SENSOR_DELAY_UI);
+             } else {
+-                if (accelerometerSensor != null) sensorManager.registerListener(this, accelerometerSensor, SensorManager.SENSOR_DELAY_GAME);
+-                if (magneticFieldSensor != null) sensorManager.registerListener(this, magneticFieldSensor, SensorManager.SENSOR_DELAY_GAME);
++                if (accelerometerSensor != null) sensorManager.registerListener(this, accelerometerSensor, SensorManager.SENSOR_DELAY_UI);
++                if (magneticFieldSensor != null) sensorManager.registerListener(this, magneticFieldSensor, SensorManager.SENSOR_DELAY_UI);
+             }
+         } catch (Exception ignored) {
+         }
+@@ -256,12 +258,23 @@
+             smoothedTrueHeading = trueHeading;
+         } else {
+             float delta = shortestHeadingDelta(smoothedTrueHeading, trueHeading);
+-            smoothedTrueHeading = normalizeDegrees(smoothedTrueHeading + delta * 0.18f);
++
++            // Ignore tiny compass chatter and heavily smooth larger changes.
++            // This keeps the boat arrow readable while still allowing deliberate turns.
++            if (Math.abs(delta) >= 1.5f) {
++                float clampedDelta = Math.max(-18f, Math.min(18f, delta));
++                smoothedTrueHeading = normalizeDegrees(smoothedTrueHeading + clampedDelta * 0.075f);
++            }
+         }
+ 
+         long now = System.currentTimeMillis();
+-        if (now - lastHeadingEmitMs < 100L) return;
++        if (now - lastHeadingEmitMs < 180L) return;
++        if (!Float.isNaN(lastEmittedHeading)) {
++            float emittedDelta = Math.abs(shortestHeadingDelta(lastEmittedHeading, smoothedTrueHeading));
++            if (emittedDelta < 0.8f && now - lastHeadingEmitMs < 600L) return;
++        }
+         lastHeadingEmitMs = now;
++        lastEmittedHeading = smoothedTrueHeading;
+         String js = String.format(Locale.US,
+                 "window.onNativeHeading && window.onNativeHeading(%.2f,%.2f,%.2f,%d);",
+                 smoothedTrueHeading, magneticHeading, declination, event.accuracy);
+--- a/app/build.gradle
++++ b/app/build.gradle
+@@ -10,8 +10,8 @@
+         applicationId 'com.lakenav.wi'
+         minSdk 26
+         targetSdk 35
+-        versionCode 3
+-        versionName '0.3.0'
++        versionCode 5
++        versionName '0.5.0'
+     }
+ 
+     buildTypes {
+--- a/README.md
++++ b/README.md
+@@ -2,9 +2,23 @@
+ 
+ LakeNav WI is a personal Android lake-navigation prototype focused on Wisconsin inland lakes and Great Lakes use.
+ 
+-## Version 0.4 features
++## Version 0.5 features
+ 
+-Version 0.4 builds on the v0.3 lake search, offline packages, waypoint navigation, GPS tracking, NOAA chart overlay, DNR lake context, weather, and DNR bathymetric-sheet support.
++Version 0.5 keeps the v0.4 navigation, bathymetry, hazard, offline-lake, waypoint, GPS tracking, weather, and DNR features while focusing on a more current 2026-style interface and calmer heading behavior.
++
++### 2026 interface refresh
++- Reworks the top status area, map chips, compass, bottom navigation dock, cards, buttons, search controls, and bottom sheets with a cleaner modern visual system.
++- Replaces text-style toolbar glyphs with built-in vector icons so the controls stay crisp and work offline.
++- Adds stronger touch feedback, larger radii, glass-style map controls, safer spacing, and improved typography.
++- Keeps the navigation map visually dominant instead of making the controls feel like desktop-era form buttons.
++
++### Heading / navigation-arrow stability
++- Uses a slower Android sensor update cadence plus heavier circular heading smoothing.
++- Adds deadband filtering so tiny compass fluctuations do not constantly move the boat arrow.
++- Limits abrupt single-sample heading jumps that commonly happen indoors, near vehicles, speakers, chargers, or other metal.
++- Uses Android GPS bearing accuracy when available and prefers GPS course-over-ground only once the boat is moving fast enough for course to be trustworthy.
++- Keeps phone true-heading compass behavior while nearly stationary, but shows a calibration warning when Android reports poor compass accuracy.
++- Anchors the boat symbol on its GPS reference point more precisely.
+ 
+ 
+ ### Course-up / north-up display modes
+@@ -45,7 +59,7 @@
+ - Shows a circular compass HUD with heading and cardinal direction.
+ - Replaces the simple GPS dot with a boat-shaped arrow that rotates with the active heading.
+ - Draws a dashed heading/look-ahead line in front of the boat.
+-- Uses GPS course-over-ground when moving faster than roughly 2.8 mph; below that speed it prefers the phone's true compass heading. This avoids unstable GPS bearings while nearly stationary.
++- Uses GPS course-over-ground when moving fast enough for a stable course and when Android reports acceptable bearing accuracy; below that speed it prefers the phone's true compass heading. This avoids unstable GPS bearings while nearly stationary.
+ - The saved offline-map fallback also rotates the boat arrow when heading data is available.
+ 
+ ### GPS navigation
+@@ -82,13 +96,13 @@
+ - If the online Leaflet library cannot load at cold start, LakeNav has a fallback that still displays the locally saved DNR map snapshot and plots the live Android GPS position on that image.
+ - GPS, locally stored waypoints, and track data do not require cell service.
+ 
+-The offline basemap is still a saved raster snapshot in v0.3, not a multi-zoom vector/tile package. Zooming beyond the downloaded image resolution will become pixelated.
++The offline basemap is still a saved raster snapshot, not yet a multi-zoom vector/tile package. Zooming beyond the downloaded image resolution will become pixelated.
+ 
+ ## Depth-data limitation
+ 
+ There is no single free public Wisconsin source that provides current, GPS-aligned vector bathymetric contours for every inland lake.
+ 
+-For v0.3, LakeNav takes a conservative approach:
++LakeNav takes a conservative approach:
+ - **NOAA ENC water:** use GPS-aligned NOAA vector depth areas and chart layers when available.
+ - **Wisconsin inland lakes:** continue to show official DNR contour sheets as reference-only unless a trustworthy georeferenced vector source is available.
+ - **Real-time depth beneath the boat:** still requires sonar/depth-sounder hardware.
+@@ -116,7 +130,7 @@
+ 1. Put the project in a GitHub repository.
+ 2. Open the repository Actions tab.
+ 3. Run the `Build Android APK` workflow, or push to the main branch.
+-4. Download the `LakeNavWI-debug-apk` artifact from the completed workflow.
++4. Download the `LakeNavWI-v0.5-debug-apk` artifact from the completed workflow.
+ 5. On the Android phone, allow installation from the app used to open the APK, then install `app-debug.apk`.
+ 
