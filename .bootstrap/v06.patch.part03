@@ -1,0 +1,70 @@
+-1353,6 +1679,7 @@ html, body {
+       if (map && baseLayer && !map.hasLayer(baseLayer)) baseLayer.addTo(map);
+       if (map && hazardLayerEnabled && hazardLayer && !map.hasLayer(hazardLayer)) hazardLayer.addTo(map);
+       $('chartChip').textContent = 'OSM map';
++      if (windEnabled) { $('windCanvas').style.display='block'; toggleWindOverlay(true); }
+     }
+     if (depthShadeEnabled) scheduleDepthShadeRefresh();
+     applyMapOrientation();
+@@ -1900,12 +2227,20 @@ html, body {
+     $('waypointsBtn').addEventListener('click', () => openSheet('waypointSheet'));
+     $('trackBtn').addEventListener('click', () => setRecording(!recording));
+     $('moreBtn').addEventListener('click', () => openSheet('moreSheet'));
++    $('layersQuickBtn').addEventListener('click', e => { e.stopPropagation(); toggleQuickLayers(); });
++    $('quickLayersClose').addEventListener('click', e => { e.stopPropagation(); closeQuickLayers(); });
+     $('stopNavBtn').addEventListener('click', stopNavigation);
+     $('addGpsWaypointBtn').addEventListener('click', addCurrentWaypoint);
+     $('addMapWaypointBtn').addEventListener('click', beginDropPin);
+     $('noaaChartToggle').addEventListener('change', e => toggleNoaa(e.target.checked));
+     $('depthShadeToggle').addEventListener('change', e => toggleDepthShading(e.target.checked));
+-    $('hazardToggle').addEventListener('change', e => toggleHazards(e.target.checked));
++    $('hazardToggle').addEventListener('change', e => { toggleHazards(e.target.checked); syncLayerControls(); });
++    $('windToggle').addEventListener('change', e => { toggleWindOverlay(e.target.checked); syncLayerControls(); });
++    $('quickNoaaToggle').addEventListener('change', e => { toggleNoaa(e.target.checked); $('noaaChartToggle').checked=e.target.checked; });
++    $('quickDepthToggle').addEventListener('change', e => toggleDepthShading(e.target.checked));
++    $('quickHazardToggle').addEventListener('change', e => toggleHazards(e.target.checked));
++    $('quickWindToggle').addEventListener('change', e => toggleWindOverlay(e.target.checked));
++    document.querySelectorAll('[data-heading-mode]').forEach(btn => btn.addEventListener('click', () => setHeadingMode(btn.dataset.headingMode)));
+     $('orientationBtn').addEventListener('click', toggleOrientationMode);
+     $('offlineModeToggle').addEventListener('change', e => setOfflineMode(e.target.checked));
+     $('lakeSearchGoBtn').addEventListener('click', searchLakes);
+@@ -1925,12 +2260,17 @@ html, body {
+ 
+     $('depthShadeToggle').checked = depthShadeEnabled;
+     $('hazardToggle').checked = hazardLayerEnabled;
++    syncLayerControls();
++    updateHeadingModeUi();
+     updateOrientationButton();
+     document.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => $(btn.dataset.close).classList.remove('open')));
+     document.querySelectorAll('.sheetBackdrop').forEach(bg => bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('open'); }));
++    document.addEventListener('click', e => { const panel=$('layersQuickPanel'), btn=$('layersQuickBtn'); if (panel && panel.classList.contains('open') && !panel.contains(e.target) && !btn.contains(e.target)) closeQuickLayers(); });
++    window.addEventListener('resize', () => { if (windEnabled) { resetWindParticles(); resizeWindCanvas(); } });
+   }
+ 
+   bindUi();
++  updateHeadingModeUi();
+   initMap();
+   renderWaypointList();
+   renderOfflineLakeList();
+diff --git a/app/src/main/java/com/lakenav/wi/MainActivity.java b/app/src/main/java/com/lakenav/wi/MainActivity.java
+index 5b8c99f..035677d 100644
+--- a/app/src/main/java/com/lakenav/wi/MainActivity.java
++++ b/app/src/main/java/com/lakenav/wi/MainActivity.java
+@@ -54,7 +54,7 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
+     private static final int REQ_LOCATION = 1001;
+     private static final int REQ_EXPORT_GPX = 2001;
+     private static final int REQ_IMPORT_GPX = 2002;
+-    private static final String APP_UA = "LakeNavWI/0.5 (+personal Android lake navigation prototype)";
++    private static final String APP_UA = "LakeNavWI/0.6 (+personal Android lake navigation prototype)";
+ 
+     private WebView webView;
+     private LocationManager locationManager;
+@@ -104,7 +104,7 @@ public class MainActivity extends Activity implements LocationListener, SensorEv
+         settings.setAllowFileAccessFromFileURLs(true);
+         settings.setAllowUniversalAccessFromFileURLs(true);
+         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+-        settings.setUserAgentString(settings.getUserAgentString() + " LakeNavWI/0.5");
++        settings.setUserAgentString(settings.getUserAgentString() + " LakeNavWI/0.6");
+ 
+         webView.setWebChromeClient(new WebChromeClient());
+         webView.setWebViewClient(new WebViewClient());
