@@ -1,0 +1,47 @@
+name: Export current LakeNav source
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - ".github/workflows/export-current-source.yml"
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+
+      - name: Materialize LakeNav WI v0.4
+        run: bash .bootstrap/apply-v04.sh
+      - name: Apply LakeNav WI v0.5
+        run: bash .bootstrap/apply-v05.sh
+      - name: Apply LakeNav WI v0.6
+        run: bash .bootstrap/apply-v06.sh
+      - name: Apply LakeNav WI v0.7
+        run: bash .bootstrap/apply-v07.sh
+      - name: Apply LakeNav WI v0.8
+        run: bash .bootstrap/apply-v08.sh
+      - name: Apply LakeNav WI v0.9
+        run: bash .bootstrap/apply-v09.sh
+      - name: Apply LakeNav WI v0.10
+        run: bash .bootstrap/apply-v010.sh
+      - name: Apply LakeNav WI v0.11
+        run: bash .bootstrap/apply-v011.sh
+      - name: Apply LakeNav WI v0.12
+        run: bash .bootstrap/apply-v012.sh
+
+      - name: Collect source snapshot
+        run: |
+          mkdir -p source-snapshot
+          cp -R app source-snapshot/app
+          cp README.md source-snapshot/README.md
+          cp settings.gradle source-snapshot/settings.gradle
+          cp build.gradle source-snapshot/build.gradle
+
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: LakeNavWI-v0.12-source-snapshot
+          path: source-snapshot
