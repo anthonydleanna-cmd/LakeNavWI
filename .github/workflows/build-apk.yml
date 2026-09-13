@@ -43,8 +43,8 @@ jobs:
 
       - name: Bundle MapLibre 3D engine into APK
         run: |
-          curl -fL --retry 3 https://unpkg.com/maplibre-gl@6.9.0/dist/maplibre-gl.js -o app/src/main/assets/maplibre-gl.js
-          curl -fL --retry 3 https://unpkg.com/maplibre-gl@6.9.0/dist/maplibre-gl.css -o app/src/main/assets/maplibre-gl.css
+          curl -fL --retry 3 https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js -o app/src/main/assets/maplibre-gl.js
+          curl -fL --retry 3 https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css -o app/src/main/assets/maplibre-gl.css
           test -s app/src/main/assets/maplibre-gl.js
           test -s app/src/main/assets/maplibre-gl.css
 
