@@ -14,65 +14,57 @@ jobs:
 
       - name: Materialize LakeNav WI v0.4
         run: bash .bootstrap/apply-v04.sh
-
       - name: Apply LakeNav WI v0.5
         run: bash .bootstrap/apply-v05.sh
-
       - name: Apply LakeNav WI v0.6
         run: bash .bootstrap/apply-v06.sh
-
       - name: Apply LakeNav WI v0.7
         run: bash .bootstrap/apply-v07.sh
-
       - name: Apply LakeNav WI v0.8
         run: bash .bootstrap/apply-v08.sh
-
       - name: Apply LakeNav WI v0.9
         run: bash .bootstrap/apply-v09.sh
-
       - name: Apply LakeNav WI v0.10
         run: bash .bootstrap/apply-v010.sh
-
       - name: Apply LakeNav WI v0.11
         run: bash .bootstrap/apply-v011.sh
-
       - name: Apply LakeNav WI v0.12
         run: bash .bootstrap/apply-v012.sh
-
       - name: Apply LakeNav WI v0.13
         run: bash .bootstrap/apply-v013.sh
-
       - name: Apply LakeNav WI v0.14
         run: bash .bootstrap/apply-v014.sh
-
       - name: Apply LakeNav WI v0.15
         run: bash .bootstrap/apply-v015.sh
-
       - name: Apply LakeNav WI v0.16
         run: bash .bootstrap/apply-v016.sh
+      - name: Apply LakeNav WI v0.17
+        run: bash .bootstrap/apply-v017.sh
+
+      - name: Bundle MapLibre 3D engine into APK
+        run: |
+          curl -fL --retry 3 https://unpkg.com/maplibre-gl@6.9.0/dist/maplibre-gl.js -o app/src/main/assets/maplibre-gl.js
+          curl -fL --retry 3 https://unpkg.com/maplibre-gl@6.9.0/dist/maplibre-gl.css -o app/src/main/assets/maplibre-gl.css
+          test -s app/src/main/assets/maplibre-gl.js
+          test -s app/src/main/assets/maplibre-gl.css
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
       - name: Install Android platform
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-
       - name: Build debug APK
         run: gradle :app:assembleDebug
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: LakeNavWI-v0.16-debug-apk
+          name: LakeNavWI-v0.17-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
