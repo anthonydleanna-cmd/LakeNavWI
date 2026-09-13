@@ -2,7 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-base64 -d .bootstrap/v015.patch.gz.b64 | gzip -d > /tmp/lakenav-v015.patch
+cat .bootstrap/v015.patch.gz.b64.part00 .bootstrap/v015.patch.gz.b64.part01 .bootstrap/v015.patch.gz.b64.part02 | base64 -d | gzip -d > /tmp/lakenav-v015.patch
 set +e
 patch -p1 < /tmp/lakenav-v015.patch
 PATCH_RC=$?
