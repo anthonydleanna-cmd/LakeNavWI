@@ -49,6 +49,12 @@ jobs:
         run: bash .bootstrap/apply-v020.sh
       - name: Apply LakeNav WI v0.21
         run: bash .bootstrap/apply-v021.sh
+      - name: Apply LakeNav WI v0.22
+        run: bash .bootstrap/apply-v022.sh
+      - name: Apply LakeNav WI v0.23
+        run: bash .bootstrap/apply-v023.sh
+      - name: Apply LakeNav WI v0.24
+        run: bash .bootstrap/apply-v024.sh
 
       - name: Collect source snapshot
         run: |
@@ -61,5 +67,5 @@ jobs:
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: LakeNavWI-v0.21-source-snapshot
+          name: LakeNavWI-v0.24-source-snapshot
           path: source-snapshot
