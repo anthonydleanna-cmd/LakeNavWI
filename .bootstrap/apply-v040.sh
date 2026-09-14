@@ -3,6 +3,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 cat .bootstrap/v040.patch.gz.b64 | base64 -d | gzip -d > /tmp/lakenav-v040.patch
+# Normalize the temporary local diff labels to the repository path before applying.
+sed -i '1c\--- a/app/src/main/assets/index.html' /tmp/lakenav-v040.patch
+sed -i '2c\+++ b/app/src/main/assets/index.html' /tmp/lakenav-v040.patch
 patch -p1 < /tmp/lakenav-v040.patch
 sed -i "s/versionCode [0-9][0-9]*/versionCode 40/" app/build.gradle
 sed -i "s/versionName '[^']*'/versionName '0.40.0'/" app/build.gradle
