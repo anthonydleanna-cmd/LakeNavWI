@@ -13,7 +13,10 @@ required=['v0.40','trackLiveTail','persistTrackNow','renderHeadingVisualsNow','r
 for token in required:
     if token not in html: errors.append('missing required v0.40 token: '+token)
 if "runNavigationArrowSyncBurst(900)" in html: errors.append('legacy 900ms arrow sync burst still present')
-if "trackLine.setLatLngs(trackPoints.map" in html: errors.append('legacy full track redraw still present in hot path')
+# Only inspect the GPS hot path for the old full-track redraw pattern; import/restore is allowed to rebuild once.
+hot_match=re.search(r'function maybeAddTrackPoint\(.*?\n  function setRecording',html,re.S)
+hot=hot_match.group(0) if hot_match else ''
+if "trackLine.setLatLngs(trackPoints.map" in hot: errors.append('legacy full track redraw still present in GPS hot path')
 scripts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',html,re.S|re.I)
 Path('/tmp/lakenav-inline.js').write_text('\n'.join(scripts))
 print(f'LakeNav diagnostics: {len(html):,} chars, {len(ids)} ids, {len(refs)} DOM refs, {len(scripts)} inline script blocks')
