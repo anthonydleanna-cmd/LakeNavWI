@@ -60,6 +60,8 @@ jobs:
         run: bash .bootstrap/apply-v026.sh
       - name: Apply LakeNav WI v0.27
         run: bash .bootstrap/apply-v027.sh
+      - name: Apply LakeNav WI v0.28
+        run: bash .bootstrap/apply-v028.sh
 
       - name: Bundle MapLibre 3D engine into APK
         run: |
@@ -86,5 +88,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: LakeNavWI-v0.27-debug-apk
+          name: LakeNavWI-v0.28-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
