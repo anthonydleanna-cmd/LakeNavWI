@@ -15,86 +15,12 @@ jobs:
       - name: Check out project
         uses: actions/checkout@v4
 
-      - name: Materialize LakeNav WI v0.4
-        run: bash .bootstrap/apply-v04.sh
-      - name: Apply LakeNav WI v0.5
-        run: bash .bootstrap/apply-v05.sh
-      - name: Apply LakeNav WI v0.6
-        run: bash .bootstrap/apply-v06.sh
-      - name: Apply LakeNav WI v0.7
-        run: bash .bootstrap/apply-v07.sh
-      - name: Apply LakeNav WI v0.8
-        run: bash .bootstrap/apply-v08.sh
-      - name: Apply LakeNav WI v0.9
-        run: bash .bootstrap/apply-v09.sh
-      - name: Apply LakeNav WI v0.10
-        run: bash .bootstrap/apply-v010.sh
-      - name: Apply LakeNav WI v0.11
-        run: bash .bootstrap/apply-v011.sh
-      - name: Apply LakeNav WI v0.12
-        run: bash .bootstrap/apply-v012.sh
-      - name: Apply LakeNav WI v0.13
-        run: bash .bootstrap/apply-v013.sh
-      - name: Apply LakeNav WI v0.14
-        run: bash .bootstrap/apply-v014.sh
-      - name: Apply LakeNav WI v0.15
-        run: bash .bootstrap/apply-v015.sh
-      - name: Apply LakeNav WI v0.16
-        run: bash .bootstrap/apply-v016.sh
-      - name: Apply LakeNav WI v0.17
-        run: bash .bootstrap/apply-v017.sh
-      - name: Apply LakeNav WI v0.18
-        run: bash .bootstrap/apply-v018.sh
-      - name: Apply LakeNav WI v0.19
-        run: bash .bootstrap/apply-v019.sh
-      - name: Apply LakeNav WI v0.20
-        run: bash .bootstrap/apply-v020.sh
-      - name: Apply LakeNav WI v0.21
-        run: bash .bootstrap/apply-v021.sh
-      - name: Apply LakeNav WI v0.22
-        run: bash .bootstrap/apply-v022.sh
-      - name: Apply LakeNav WI v0.23
-        run: bash .bootstrap/apply-v023.sh
-      - name: Apply LakeNav WI v0.24
-        run: bash .bootstrap/apply-v024.sh
-      - name: Apply LakeNav WI v0.25
-        run: bash .bootstrap/apply-v025.sh
-      - name: Apply LakeNav WI v0.26
-        run: bash .bootstrap/apply-v026.sh
-      - name: Apply LakeNav WI v0.27
-        run: bash .bootstrap/apply-v027.sh
-      - name: Apply LakeNav WI v0.28
-        run: bash .bootstrap/apply-v028.sh
-      - name: Apply LakeNav WI v0.29
-        run: bash .bootstrap/apply-v029.sh
-      - name: Apply LakeNav WI v0.30
-        run: bash .bootstrap/apply-v030.sh
-      - name: Apply LakeNav WI v0.31
-        run: bash .bootstrap/apply-v031.sh
-      - name: Apply LakeNav WI v0.32
-        run: bash .bootstrap/apply-v032.sh
-      - name: Apply LakeNav WI v0.33
-        run: bash .bootstrap/apply-v033.sh
-      - name: Apply LakeNav WI v0.34
-        run: bash .bootstrap/apply-v034.sh
-      - name: Apply LakeNav WI v0.35
-        run: bash .bootstrap/apply-v035.sh
-      - name: Apply LakeNav WI v0.36
-        run: bash .bootstrap/apply-v036.sh
-      - name: Apply LakeNav WI v0.37
-        run: bash .bootstrap/apply-v037.sh
-      - name: Apply LakeNav WI v0.38
-        run: bash .bootstrap/apply-v038.sh
-      - name: Apply LakeNav WI v0.39
-        run: bash .bootstrap/apply-v039.sh
-      - name: Apply LakeNav WI v0.40
-        run: bash .bootstrap/apply-v040.sh
-      - name: Apply LakeNav WI v0.41
-        run: bash .bootstrap/apply-v041.sh
-      - name: Apply LakeNav WI v0.42
-        run: bash .bootstrap/apply-v042.sh
-      - name: Apply LakeNav WI v0.43
-        run: bash .bootstrap/apply-v043.sh
+      - name: Materialize LakeNav WI through latest patch
+        run: |
+          find .bootstrap -maxdepth 1 -type f -name 'apply-v*.sh' -print | sort -V | while read -r script; do
+            echo "Applying $script"
+            bash "$script"
+          done
 
       - name: Bundle MapLibre 3D engine into APK
         run: |
@@ -118,10 +44,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
+
       - name: Build debug APK
         run: gradle :app:assembleDebug
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: LakeNavWI-v0.43-debug-apk
+          name: LakeNavWI-v0.44-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
