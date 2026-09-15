@@ -1,0 +1,231 @@
+--- a/app/src/main/assets/index.html
++++ b/app/src/main/assets/index.html
+@@ -643,6 +643,13 @@
+ #mapWrap.navStateFreePan #chartChip { border-style:dashed; }
+ #mapWrap.navStatePlanning #chartChip { letter-spacing:.045em; }
+ 
++/* v0.44 cross-track error / off-course guidance */
++#navPanel.active { grid-template-columns:1fr auto auto auto auto auto auto; }
++#navXteMetric span { display:block; font-size:8px; letter-spacing:.05em; }
++#xteChip { left:10px; top:104px; display:none; max-width:260px; font-size:11px; }
++#xteChip.offCourse { background:rgba(255,246,229,.96); color:#8a3e00; border:1px solid rgba(242,153,0,.42); box-shadow:0 7px 18px rgba(90,45,0,.18); }
++@media(max-width:720px){ #navPanel.active { grid-template-columns:1fr auto auto; } #xteChip { top:104px; max-width:235px; } }
++
+ </style>
+ <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" onerror="window.leafletFailed=true"></script>
+ <script src="maplibre-gl.js" onerror="window.maplibreFailed=true"></script>
+@@ -651,7 +658,7 @@
+ <div id="app">
+   <div id="statusbar">
+     <div>
+-      <div id="brand">LakeNav WI <span class="versionPill">v0.43</span></div>
++      <div id="brand">LakeNav WI <span class="versionPill">v0.44</span></div>
+       <div id="gpsState">Waiting for GPS...</div>
+     </div>
+     <div id="gpsNumbers">
+@@ -666,6 +673,7 @@
+     <div class="navMetric"><strong id="navLeg">--</strong>leg</div>
+     <div class="navMetric"><strong id="navDistance">--</strong>distance</div>
+     <div class="navMetric"><strong id="navBearing">--</strong>bearing</div>
++    <div class="navMetric" id="navXteMetric"><strong id="navXte">--</strong><span id="navXteSide">XTE</span></div>
+     <button class="btn small secondary" id="nextRouteBtn">Next</button>
+     <button class="btn small danger" id="stopNavBtn">Stop</button>
+   </div>
+@@ -695,6 +703,7 @@
+       <p class="muted">Open Lake Search and choose a previously saved lake. LakeNav stores a Wisconsin DNR map snapshot locally, so the saved lake map and GPS position can still be displayed without network map tiles.</p>
+     </div>
+     <div id="trackChip" class="map-chip">Track: <strong id="trackDistance">0.00 mi</strong></div>
++    <div id="xteChip" class="map-chip"><strong id="xteChipText">XTE --</strong></div>
+     <div id="chartChip" class="map-chip">OSM map</div>
+     <div id="mapRightDock" aria-label="Map shortcuts">
+       <button id="weatherQuickBtn" class="mapDockBtn" aria-label="Open weather layers"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17h10a4 4 0 0 0 .2-8 6 6 0 0 0-11.4 1.7A3.3 3.3 0 0 0 7 17Z"/><path d="M8 20h1M12 20h1M16 20h1"/></svg><span>Weather</span></button>
+@@ -1017,6 +1026,12 @@
+     </div>
+ 
+     <div class="card">
++      <h3>Route guidance</h3>
++      <div class="editorField"><label for="xteLimitSelect">Off-course warning</label><select class="textInput" id="xteLimitSelect"><option value="100">100 ft</option><option value="150">150 ft</option><option value="200">200 ft</option><option value="300">300 ft</option><option value="500">500 ft</option><option value="1000">1,000 ft</option></select></div>
++      <div class="muted">Cross-track error (XTE) measures how far the boat is left or right of the active route leg. LakeNav warns after the selected distance and tells you which direction returns toward the route.</div>
++    </div>
++
++    <div class="card">
+       <h3>Storm alert range</h3>
+       <div class="row"><label class="switchLine"><input type="checkbox" id="stormAlertsToggle" /> Storm alerts while LakeNav is running</label></div>
+       <div class="editorField"><label for="stormRadiusSelect">Alert radius</label><select class="textInput" id="stormRadiusSelect"><option value="5">5 miles</option><option value="10">10 miles</option><option value="25">25 miles</option><option value="50">50 miles</option></select></div>
+@@ -1078,6 +1093,7 @@
+   const STORAGE_MAP_MODE = 'lakenav.mapmode.v1';
+   const STORAGE_NAV_PERSPECTIVE = 'lakenav.navperspective.v1';
+   const STORAGE_NOAA_AIDS = 'lakenav.noaaaids.v1';
++  const STORAGE_XTE_LIMIT = 'lakenav.xte.limit.ft.v1';
+   const ROUTE_ADVANCE_M = 45.72; // 150 ft
+   const SEAMARK_TILE_URL = 'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png';
+   const NOAA_DEPTH_SOURCES = [
+@@ -1106,6 +1122,10 @@
+   let noaaAidsCoverage = null;
+   let noaaAidsZoomBand = null;
+   let noaaAidsLastFetch = 0;
++  let xteLimitFt = [100,150,200,300,500,1000].includes(Number(localStorage.getItem(STORAGE_XTE_LIMIT))) ? Number(localStorage.getItem(STORAGE_XTE_LIMIT)) : 200;
++  let offCourseActive = false;
++  let lastOffCourseNoticeAt = 0;
++  let xteGuideLine = null;
+   let baseLayer = null;
+   let noaaLayer = null;
+   let positionMarker = null;
+@@ -3344,6 +3364,7 @@
+     $('routeNavStatus').classList.remove('active');
+     $('routeNavStatus').textContent = '';
+     $('routeLegDetail').textContent = '';
++    clearCrossTrackGuidance();
+     $('navLeg').textContent = '--';
+     $('nextRouteBtn').classList.remove('active');
+     updateNavigation();
+@@ -3374,6 +3395,87 @@
+     return route.waypointIds.map(id => waypoints.find(w => w.id === id)).filter(Boolean);
+   }
+ 
++  function routeCrossTrackInfo(loc,a,b) {
++    if (!loc || !a || !b) return null;
++    const R=6371000, rad=Math.PI/180;
++    const lat0=((Number(a.lat)+Number(b.lat)+Number(loc.lat))/3)*rad;
++    const cosLat=Math.max(.15,Math.cos(lat0));
++    const bx=(Number(b.lon)-Number(a.lon))*rad*R*cosLat;
++    const by=(Number(b.lat)-Number(a.lat))*rad*R;
++    const px=(Number(loc.lon)-Number(a.lon))*rad*R*cosLat;
++    const py=(Number(loc.lat)-Number(a.lat))*rad*R;
++    const len2=bx*bx+by*by;
++    if (!Number.isFinite(len2) || len2<1) return null;
++    const rawT=(px*bx+py*by)/len2;
++    const t=Math.max(0,Math.min(1,rawT));
++    const nx=bx*t, ny=by*t;
++    const dx=px-nx, dy=py-ny;
++    const meters=Math.hypot(dx,dy);
++    const cross=bx*py-by*px;
++    const side=cross>=0?'LEFT':'RIGHT';
++    const correction=side==='LEFT'?'RIGHT':'LEFT';
++    const nearest={
++      lat:Number(a.lat)+(Number(b.lat)-Number(a.lat))*t,
++      lon:Number(a.lon)+(Number(b.lon)-Number(a.lon))*t
++    };
++    return {meters,signedMeters:cross>=0?meters:-meters,side,correction,t,rawT,nearest,usable:rawT>=-.12&&rawT<=1.15};
++  }
++
++  function clearCrossTrackGuidance() {
++    offCourseActive=false;
++    if ($('navXte')) $('navXte').textContent='--';
++    if ($('navXteSide')) $('navXteSide').textContent='XTE';
++    if ($('xteChip')) $('xteChip').style.display='none';
++    if (map && xteGuideLine) { try { map.removeLayer(xteGuideLine); } catch(e) {} }
++    xteGuideLine=null;
++  }
++
++  function updateCrossTrackGuidance(route,pts) {
++    if (!currentLoc || !route || !pts || activeRouteIndex<=0 || activeRouteIndex>=pts.length) {
++      clearCrossTrackGuidance();
++      return null;
++    }
++    const a=pts[activeRouteIndex-1], b=pts[activeRouteIndex];
++    const info=routeCrossTrackInfo(currentLoc,a,b);
++    if (!info || !info.usable) { clearCrossTrackGuidance(); return info; }
++    const ft=info.meters*M_TO_FT;
++    if ($('navXte')) $('navXte').textContent=ft<1000?Math.round(ft)+' ft':(ft/5280).toFixed(2)+' mi';
++    if ($('navXteSide')) $('navXteSide').textContent='XTE '+info.side;
++
++    const limitM=xteLimitFt/M_TO_FT;
++    const accuracy=Number.isFinite(Number(currentLoc.accuracy))&&Number(currentLoc.accuracy)>0?Number(currentLoc.accuracy):8;
++    const eligible=accuracy<=Math.max(24,limitM*.60);
++    const nextOff=offCourseActive ? info.meters>limitM*.72 : info.meters>limitM;
++    const warning=eligible && nextOff;
++    if (warning && !offCourseActive) {
++      const now=Date.now();
++      if (now-lastOffCourseNoticeAt>15000) {
++        lastOffCourseNoticeAt=now;
++        if (navigator.vibrate) { try { navigator.vibrate([90,70,90]); } catch(e) {} }
++        if (window.Android && Android.toast) Android.toast('Off course '+Math.round(ft)+' ft '+info.side+'. Steer '+info.correction+' toward route.');
++      }
++    }
++    offCourseActive=warning;
++
++    const chip=$('xteChip'), chipText=$('xteChipText');
++    if (chip && chipText) {
++      chip.style.display='block';
++      chip.classList.toggle('offCourse',warning);
++      chipText.textContent=(warning?'OFF COURSE • ':'XTE • ')+Math.round(ft)+' ft '+info.side+' • steer '+info.correction;
++    }
++
++    if (map && info.meters>6) {
++      const linePts=[[currentLoc.lat,currentLoc.lon],[info.nearest.lat,info.nearest.lon]];
++      const color=warning?'#f29900':'#1aa6c8';
++      if (!xteGuideLine) xteGuideLine=L.polyline(linePts,{color,weight:3,opacity:.72,dashArray:'6 7',interactive:false}).addTo(map);
++      else { xteGuideLine.setLatLngs(linePts); xteGuideLine.setStyle({color}); }
++    } else if (map && xteGuideLine) {
++      try { map.removeLayer(xteGuideLine); } catch(e) {}
++      xteGuideLine=null;
++    }
++    return info;
++  }
++
+   function currentNavigationTarget() {
+     if (activeRouteId && routeTarget) return routeTarget;
+     return targetId ? waypoints.find(w => w.id === targetId) : null;
+@@ -3485,6 +3587,7 @@
+     $('routeNavStatus').classList.remove('active');
+     $('routeNavStatus').textContent = '';
+     $('routeLegDetail').textContent = '';
++    clearCrossTrackGuidance();
+     $('navLeg').textContent = '--';
+     $('nextRouteBtn').classList.remove('active');
+     if (map && navLine) {
+@@ -3549,15 +3652,19 @@
+           const mph = currentLoc.speed >= 0 ? currentLoc.speed * MPS_TO_MPH : 0;
+           const eta = mph >= 1 ? formatEtaHours((remaining * M_TO_MI) / mph) : 'ETA --';
+           $('navLeg').textContent = activeRouteIndex + '/' + (pts.length - 1);
+-          $('routeLegDetail').textContent = 'Leg ' + activeRouteIndex + ': ' + formatDistance(legD) + ' · ' + Math.round(legB) + '° ' + cardinal(legB) + ' · route left ' + formatDistance(remaining) + ' · ' + eta;
++          const xte=updateCrossTrackGuidance(route,pts);
++          const xteText=xte&&xte.usable ? ' · XTE ' + Math.round(xte.meters*M_TO_FT) + ' ft ' + xte.side + ' · steer ' + xte.correction : '';
++          $('routeLegDetail').textContent = 'Leg ' + activeRouteIndex + ': ' + formatDistance(legD) + ' · ' + Math.round(legB) + '° ' + cardinal(legB) + ' · route left ' + formatDistance(remaining) + ' · ' + eta + xteText;
+         } else {
+           $('navLeg').textContent = 'START';
++          clearCrossTrackGuidance();
+           $('routeLegDetail').textContent = 'Approaching route start · ' + formatDistance(d) + ' away';
+         }
+       }
+     } else {
+       $('navLeg').textContent = '--';
+       $('routeLegDetail').textContent = '';
++      clearCrossTrackGuidance();
+     }
+ 
+     updateNavCruiseHud(navRemainingMeters);
+@@ -5235,6 +5342,7 @@
+     stormAlertsEnabled = !!$('stormAlertsToggle').checked;
+     stormRadiusMiles = Number($('stormRadiusSelect').value || 10);
+     lightningRadiusMiles = Number($('lightningRadiusSelect').value || 10);
++    xteLimitFt = Number($('xteLimitSelect').value || 200);
+     liveLightningEnabled = !!$('liveLightningToggle').checked;
+     xweatherClientId = $('xweatherClientIdInput').value.trim();
+     xweatherSecret = $('xweatherSecretInput').value.trim();
+@@ -5245,6 +5353,7 @@
+     localStorage.setItem(STORAGE_STORM_ALERTS, stormAlertsEnabled ? '1':'0');
+     localStorage.setItem(STORAGE_STORM_RADIUS, String(stormRadiusMiles));
+     localStorage.setItem(STORAGE_LIGHTNING_RADIUS, String(lightningRadiusMiles));
++    localStorage.setItem(STORAGE_XTE_LIMIT, String(xteLimitFt));
+     localStorage.setItem(STORAGE_LIVE_LIGHTNING, liveLightningEnabled ? '1':'0');
+     localStorage.setItem(STORAGE_XWEATHER_ID, xweatherClientId);
+     localStorage.setItem(STORAGE_XWEATHER_SECRET, xweatherSecret);
+@@ -5264,6 +5373,7 @@
+     $('stormRadiusSelect').value = String(stormRadiusMiles);
+     $('settingsLightningToggle').checked = lightningEnabled;
+     $('lightningRadiusSelect').value = String(lightningRadiusMiles);
++    $('xteLimitSelect').value = String(xteLimitFt);
+     $('liveLightningToggle').checked = liveLightningEnabled;
+     $('xweatherClientIdInput').value = xweatherClientId;
+     $('xweatherSecretInput').value = xweatherSecret;
+@@ -5892,7 +6002,7 @@
+     });
+     $('dnrMapsBtn').addEventListener('click', () => openExternal('https://dnr.wisconsin.gov/topic/Fishing/questions/lakemaps'));
+     $('dnrViewerBtn').addEventListener('click', () => openExternal('https://dnr.wisconsin.gov/topic/Lakes/Viewer'));
+-    ['mobSmsToggle','mobSilentToggle','mobContactsInput','mobMessageInput','stormAlertsToggle','stormRadiusSelect','lightningRadiusSelect','liveLightningToggle','xweatherClientIdInput','xweatherSecretInput'].forEach(id => { const el=$(id); if(el) el.addEventListener('change', saveSettingsFromUi); });
++    ['mobSmsToggle','mobSilentToggle','mobContactsInput','mobMessageInput','stormAlertsToggle','stormRadiusSelect','lightningRadiusSelect','xteLimitSelect','liveLightningToggle','xweatherClientIdInput','xweatherSecretInput'].forEach(id => { const el=$(id); if(el) el.addEventListener('change', saveSettingsFromUi); });
+     $('settingsLightningToggle').addEventListener('change', e => { toggleLightningRisk(e.target.checked); saveSettingsFromUi(); });
+     $('mobContactsInput').addEventListener('input', saveSettingsFromUi);
+     $('pickMobContactBtn').addEventListener('click', pickMobContact);
