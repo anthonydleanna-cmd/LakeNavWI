@@ -1,5 +1,7 @@
 from pathlib import Path
 p=Path('app/src/main/assets/index.html')
 s=p.read_text()
-s=s.replace('const aheadPx=Math.max(80,Math.min(420,visibleHeight*(anchorY-.50)));','const anchorOffsetPx=Math.max(80,Math.min(420,visibleHeight*(anchorY-.50)));',1)
-p.write_text(s)
+a='const rad=normalizeDegrees(h.degrees)*Math.PI/180;'
+b='const visualDeg=Number.isFinite(Number(mapRotationDeg)) ? normalizeDegrees(Number(mapRotationDeg)) : 0;\n      const rad=visualDeg*Math.PI/180;'
+if a not in s: raise SystemExit('rotation anchor missing')
+p.write_text(s.replace(a,b,1))
