@@ -2,7 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-base64 -d .bootstrap/v044.patch.gz.b64 | gzip -d > /tmp/v044.patch
+cat .bootstrap/v044.patch.gz.b64.part00 .bootstrap/v044.patch.gz.b64.part01 | base64 -d | gzip -d > /tmp/v044.patch
 patch -p1 < /tmp/v044.patch
 sed -i "s/versionCode [0-9][0-9]*/versionCode 44/" app/build.gradle
 sed -i "s/versionName '[^']*'/versionName '0.44.0'/" app/build.gradle
