@@ -1,0 +1,1 @@
+LakeNav WI v0.62 heading smoothing update.
