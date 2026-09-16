@@ -1,0 +1,130 @@
++      if(!stats.has(key)) stats.set(key,{key,candidate:c,distanceM:0,elapsedMs:0,pointHits:0,segmentHits:0});
++      return stats.get(key);
++    };
++    points.forEach(p=>{
++      const containing=candidates.filter(c=>pointInLakeFeature(Number(p.lat),Number(p.lon),c.feature)).sort((a,b)=>a.area-b.area);
++      if(containing[0]) statFor(containing[0]).pointHits++;
++    });
++    for(let i=1;i<points.length;i++) {
++      const b=points[i],a=points[i-1]; if(b.breakBefore) continue;
++      const midLat=(Number(a.lat)+Number(b.lat))/2, midLon=(Number(a.lon)+Number(b.lon))/2;
++      const containing=candidates.filter(c=>pointInLakeFeature(midLat,midLon,c.feature)).sort((x,y)=>x.area-y.area);
++      if(!containing[0]) continue;
++      const s=statFor(containing[0]);
++      s.segmentHits++;
++      s.distanceM+=distanceMeters(Number(a.lat),Number(a.lon),Number(b.lat),Number(b.lon));
++      const dt=Number(b.time)-Number(a.time); if(Number.isFinite(dt)&&dt>0&&dt<30*60*1000) s.elapsedMs+=dt;
++    }
++    return [...stats.values()].filter(s=>s.segmentHits>0&&(s.distanceM>=35||s.elapsedMs>=45000||s.pointHits>=2)).map(s=>({
++      name:s.candidate.name,wbic:s.candidate.wbic,center:{lat:Number(s.candidate.center.lat),lon:Number(s.candidate.center.lon)},
++      acres:Number.isFinite(Number(s.candidate.acres))?Number(s.candidate.acres):null,
++      distanceM:Math.round(s.distanceM),elapsedMs:Math.round(s.elapsedMs),pointHits:s.pointHits
++    }));
++  }
++
++  async function classifyTrackHistoryForLakes(history) {
++    const features=await queryTrackLakeCandidates(history);
++    const matches=trackLakeMatchesForHistory(history,features);
++    return {trackId:String(history.id),trackStartTime:Number(history.startTime)||0,trackEndTime:Number(history.endTime)||0,processedAt:Date.now(),matches};
++  }
++
++  function aggregatedRecentlyBoatedLakes() {
++    const groups=new Map();
++    (lakeTrackMatches||[]).forEach(record=>{
++      (record&&Array.isArray(record.matches)?record.matches:[]).forEach(m=>{
++        const key=lakeLibraryKey(m); if(!key) return;
++        let g=groups.get(key);
++        if(!g) { g={name:m.name||'Unnamed Lake',wbic:m.wbic||'',center:m.center||null,acres:Number.isFinite(Number(m.acres))?Number(m.acres):null,trips:0,totalDistanceM:0,totalElapsedMs:0,lastTripAt:0,firstTripAt:0}; groups.set(key,g); }
++        g.trips++;
++        g.totalDistanceM+=Number(m.distanceM)||0;
++        g.totalElapsedMs+=Number(m.elapsedMs)||0;
++        const when=Number(record.trackEndTime)||Number(record.trackStartTime)||0;
++        g.lastTripAt=Math.max(g.lastTripAt,when);
++        g.firstTripAt=g.firstTripAt?Math.min(g.firstTripAt,when):when;
++        if(!g.center&&m.center) g.center=m.center;
++        if(!Number.isFinite(Number(g.acres))&&Number.isFinite(Number(m.acres))) g.acres=Number(m.acres);
++      });
++    });
++    return [...groups.values()].sort((a,b)=>Number(b.lastTripAt)-Number(a.lastTripAt));
++  }
++
++  function recentlyBoatedLakeRow(entry) {
++    const token=libraryEntryToken(entry); const favorite=isLakeFavorite(entry);
++    const when=entry.lastTripAt?new Date(Number(entry.lastTripAt)).toLocaleDateString([], {month:'short',day:'numeric',year:'numeric'}):'Unknown date';
++    const trips=Number(entry.trips)||1;
++    const bits=[(trips+' trip'+(trips===1?'':'s')),('Last '+when)];
++    if(Number(entry.totalDistanceM)>0) bits.push(formatHistoryDistance(entry.totalDistanceM)+' tracked');
++    if(Number(entry.totalElapsedMs)>0) bits.push(formatTripDuration(entry.totalElapsedMs)+' tracked');
++    return '<div class="lakeLibraryRow"><div><div class="lakeLibraryName"><strong>'+escapeHtml(entry.name||'Unnamed Lake')+'</strong><span class="lakeLibraryTripBadge">boated</span></div><div class="lakeLibraryMeta">'+bits.map(escapeHtml).join(' • ')+'</div></div><div class="lakeLibraryRowActions"><button class="btn small secondary lakeFavoriteBtn '+(favorite?'active':'')+'" data-library-favorite="'+token+'" aria-label="Favorite">'+(favorite?'★':'☆')+'</button><button class="btn small" data-library-open="'+token+'">OPEN</button></div></div>';
++  }
++
++  function renderRecentlyBoatedLibrary() {
++    const holder=$('lakeLibraryBoated'), status=$('lakeLibraryBoatedStatus'); if(!holder) return;
++    const rows=aggregatedRecentlyBoatedLakes();
++    const processed=new Set((lakeTrackMatches||[]).map(x=>String(x&&x.trackId||'')).filter(Boolean));
++    const eligible=(trackHistory||[]).filter(h=>h&&h.id&&Array.isArray(h.points)&&h.points.length>=2);
++    const remaining=eligible.filter(h=>!processed.has(String(h.id))).length;
++    if($('lakeLibraryBoatedCount')) $('lakeLibraryBoatedCount').textContent=String(rows.length);
++    if(status) {
++      if(lakeTrackSyncActive) status.textContent='Matching saved Track logs to Wisconsin DNR lake boundaries…';
++      else if(!eligible.length) status.textContent='No completed Track sessions yet.';
++      else status.textContent=processed.size+' of '+eligible.length+' Track logs checked'+(remaining?' • '+remaining+' waiting to sync':' • up to date');
++    }
++    if(!rows.length) { holder.innerHTML='<div class="lakeLibraryEmpty">'+(eligible.length?'No saved Track has matched a Wisconsin lake yet. Tap Sync tracks to check older logs.':'Record a Track on a Wisconsin lake and it will appear here after the trip is saved.')+'</div>'; return; }
++    holder.innerHTML=rows.slice(0,15).map(recentlyBoatedLakeRow).join(''); bindLakeLibraryActions(holder);
++  }
++
++  async function syncRecentlyBoatedFromTrackLogs(full=false) {
++    if(lakeTrackSyncActive) return;
++    saveLakeTrackMatches();
++    const processed=new Set((lakeTrackMatches||[]).map(x=>String(x&&x.trackId||'')).filter(Boolean));
++    let pending=(trackHistory||[]).filter(h=>h&&h.id&&Array.isArray(h.points)&&h.points.length>=2&&!processed.has(String(h.id))).sort((a,b)=>Number(b.endTime||0)-Number(a.endTime||0));
++    if(!full) pending=pending.slice(0,8);
++    if(!pending.length) { renderRecentlyBoatedLibrary(); return; }
++    lakeTrackSyncActive=true; const runId=++lakeTrackSyncRunId; renderRecentlyBoatedLibrary();
++    const btn=$('lakeLibrarySyncTracksBtn'); if(btn) btn.disabled=true;
++    for(const h of pending) {
++      if(runId!==lakeTrackSyncRunId) break;
++      try {
++        const record=await classifyTrackHistoryForLakes(h);
++        lakeTrackMatches=lakeTrackMatches.filter(x=>String(x&&x.trackId||'')!==String(h.id));
++        lakeTrackMatches.push(record); saveLakeTrackMatches(); renderRecentlyBoatedLibrary();
++      } catch(e) {
++        // Leave this track unprocessed so a later sync can retry when data service/network is available.
++        if(window.console&&console.debug) console.debug('LakeNav track/lake match unavailable',h.id,e);
++      }
++    }
++    if(runId===lakeTrackSyncRunId) lakeTrackSyncActive=false;
++    if(btn) btn.disabled=false;
++    saveLakeTrackMatches(); renderRecentlyBoatedLibrary();
++  }
++
+   function libraryEntryToken(entry) {
+     const token='lib'+(++lakeLibraryEntrySeq);
+     lakeLibraryEntryMap.set(token,entry);
+@@ -7409,11 +7597,13 @@
+ 
+   function renderLakeLibrary() {
+     lakeLibraryEntryMap=new Map(); lakeLibraryEntrySeq=0;
++    saveLakeTrackMatches();
+     const fav=$('lakeLibraryFavorites'), rec=$('lakeLibraryRecents'), near=$('lakeLibraryNearby');
+     if($('lakeLibraryFavoriteCount')) $('lakeLibraryFavoriteCount').textContent=String(lakeFavorites.length);
+     if($('lakeLibraryRecentCount')) $('lakeLibraryRecentCount').textContent=String(lakeRecents.length);
+     if(fav) { fav.innerHTML=lakeFavorites.length?lakeFavorites.slice(0,12).map(x=>libraryLakeRow(x)).join(''):'<div class="lakeLibraryEmpty">Favorite a lake from Lake Discovery and it will stay here.</div>'; bindLakeLibraryActions(fav); }
+     if(rec) { rec.innerHTML=lakeRecents.length?lakeRecents.slice(0,10).map(x=>libraryLakeRow(x)).join(''):'<div class="lakeLibraryEmpty">Lakes you explore will appear here automatically.</div>'; bindLakeLibraryActions(rec); }
++    renderRecentlyBoatedLibrary();
+     if(near) { near.innerHTML=lakeNearby.length?lakeNearby.slice(0,12).map(x=>libraryLakeRow(x)).join(''):'<div class="lakeLibraryEmpty">'+(currentLoc?'Tap Refresh to find Wisconsin lakes around your current position.':'A GPS fix is needed to find nearby lakes.')+'</div>'; bindLakeLibraryActions(near); }
+     const radius=$('lakeLibraryNearbyRadius'); if(radius) radius.value=String(lakeNearbyRadiusMiles);
+     renderLakeLibraryOffline();
+@@ -7469,6 +7659,7 @@
+     renderLakeLibrary();
+     openSheet('lakeLibrarySheet');
+     if(currentLoc && !lakeNearby.length) refreshLakeLibraryNearby(false);
++    syncRecentlyBoatedFromTrackLogs(false);
+   }
+ 
+   function clearSelectedLakeDiscovery() {
+@@ -8696,7 +8887,8 @@
+     $('markBtn').addEventListener('click', addCurrentWaypoint);
+     $('searchBtn').addEventListener('click', openLakeLibrarySheet);
+     $('lakeLibrarySearchBtn').addEventListener('click', () => { closeSheets(); renderOfflineLakeList(); openSheet('searchSheet'); });
