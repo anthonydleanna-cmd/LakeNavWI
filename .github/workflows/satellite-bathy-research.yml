@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: hdugan/NTLlakeloads
-          path: /tmp/NTLlakeloads
+          path: ntl-reference
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -27,6 +27,8 @@ jobs:
         run: pip install geopandas requests pyogrio shapely pyproj
 
       - name: Run discovery
+        env:
+          NTL_REFERENCE_ROOT: ${{ github.workspace }}/ntl-reference
         run: python research/satellite_bathy_discovery.py
 
       - name: Upload discovery outputs
