@@ -11,19 +11,22 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe DNR endpoints
+      - name: Probe DNR and ArcGIS Online endpoints
         shell: bash
         run: |
           set +e
           urls=(
             'https://dnrmaps.wi.gov/arcgis/rest/services/ER_Biotics/ER_Biotics_WGS84_Hydro/MapServer/0?f=pjson'
-            'https://dnrmaps.wisconsin.gov/arcgis/rest/services/ER_Biotics/ER_Biotics_WGS84_Hydro/MapServer/0?f=pjson'
-            'https://dnrmaps.wisconsin.gov/arcgis/rest/services/FR_WIS_BURN/FR_WIS_BURN_MAP_EXT/MapServer/11?f=pjson'
-            'https://dnrmaps.wisconsin.gov/arcgis/rest/services/WT_SWDV/WT_Inland_Water_Resources_WTM_Ext_v2/MapServer/3?f=pjson'
+            'https://www.arcgis.com/sharing/rest/content/items/cb1c7f75d14f42ee819a46894fd2e771?f=json'
+            'https://www.arcgis.com/sharing/rest/content/items/cb1c7f75d14f42ee819a46894fd2e771/data'
           )
           for u in "${urls[@]}"; do
             echo "=== $u"
-            curl -L -sS --connect-timeout 12 --max-time 20 -o /tmp/out.txt -w 'http=%{http_code} connect=%{time_connect} total=%{time_total} bytes=%{size_download}\n' "$u"
-            head -c 180 /tmp/out.txt; echo
+            rm -f /tmp/out.bin
+            curl -L -sS --connect-timeout 12 --max-time 60 -o /tmp/out.bin -w 'http=%{http_code} connect=%{time_connect} total=%{time_total} bytes=%{size_download} type=%{content_type}\n' "$u"
+            if test -f /tmp/out.bin; then
+              file /tmp/out.bin
+              head -c 220 /tmp/out.bin | strings | head -5
+            fi
           done
           exit 0
