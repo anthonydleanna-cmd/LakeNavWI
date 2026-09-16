@@ -1,0 +1,130 @@
++    const gpsDistanceM=currentLoc ? distanceMeters(currentLoc.lat,currentLoc.lon,lat,lon) : null;
++    const lakeDistanceM=env ? distanceMeters(env.centerLat,env.centerLon,lat,lon) : Infinity;
+     return {
+       lat,lon,
+       name:String(a.LMS_BOAT_LANDING_NAME||'Public boat access'),
+@@ -6789,16 +6813,17 @@
+       waterbody:String(a.WATERBODY_NAME_TEXT||''),
+       owner:String(a.OWNERSHIP_NAME_TEXT||''),
+       county:String(a.COUNTY_NAME_TEXT||''),
+-      distanceM: currentLoc ? distanceMeters(currentLoc.lat,currentLoc.lon,lat,lon) : Infinity
++      gpsDistanceM:Number.isFinite(gpsDistanceM)?gpsDistanceM:null,
++      lakeDistanceM:Number.isFinite(lakeDistanceM)?lakeDistanceM:Infinity,
++      distanceM:Number.isFinite(gpsDistanceM)?gpsDistanceM:lakeDistanceM,
++      matchQuality:'nearby'
+     };
+   }
+ 
+-  async function findClosestBoatLaunchForSelectedLake() {
++  async function findBoatLaunchesForSelectedLake(limit=8) {
+     if (!selectedLake) throw new Error('Select a lake first.');
+-    if (!currentLoc || !Number.isFinite(Number(currentLoc.lat)) || !Number.isFinite(Number(currentLoc.lon))) throw new Error('Waiting for a GPS location before choosing the closest launch.');
+     const env=selectedLakeSearchEnvelope();
+     if (!env) throw new Error('Open the lake first so LakeNav can identify its shoreline.');
+-
+     const where="ABANDON_FLAG <> 'Yes'";
+     const geometry=[env.west,env.south,env.east,env.north].join(',');
+     const url=dnrBoatAccessQueryBase()+
+@@ -6811,22 +6836,132 @@
+     if (!resp.ok) throw new Error('Wisconsin DNR boat access search returned HTTP '+resp.status+'.');
+     const json=await resp.json();
+     if (json.error) throw new Error(json.error.message||'Wisconsin DNR boat access search failed.');
+-    let candidates=(json.features||[]).map(launchCandidateFromFeature).filter(Boolean);
+-    if (!candidates.length) throw new Error('No public boat access site was found near this lake in the Wisconsin DNR database.');
++    let candidates=(json.features||[]).map(f=>launchCandidateFromFeature(f,env)).filter(Boolean);
++    if (!candidates.length) return [];
+ 
+     const lakeKey=normalizeLakeAccessName(selectedLake.name);
+-    const exact=candidates.filter(c=>normalizeLakeAccessName(c.waterbody)===lakeKey);
+-    const loose=candidates.filter(c=>{
++    candidates.forEach(c=>{
+       const k=normalizeLakeAccessName(c.waterbody);
+-      return k && lakeKey && (k.includes(lakeKey)||lakeKey.includes(k));
++      if (k && lakeKey && k===lakeKey) c.matchQuality='matched';
++      else if (k && lakeKey && (k.includes(lakeKey)||lakeKey.includes(k))) c.matchQuality='matched';
+     });
+-    if (exact.length) candidates=exact;
+-    else if (loose.length) candidates=loose;
++    const matched=candidates.filter(c=>c.matchQuality==='matched');
++    if (matched.length) {
++      // Keep true lake matches first, plus a few very-nearby options so connected
++      // waters and alternate DNR naming do not hide a useful ramp.
++      const nearby=candidates.filter(c=>c.matchQuality!=='matched').sort((a,b)=>a.lakeDistanceM-b.lakeDistanceM).slice(0,2);
++      candidates=matched.concat(nearby);
++    }
++    candidates.sort((a,b)=>{
++      if (a.matchQuality!==b.matchQuality) return a.matchQuality==='matched'?-1:1;
++      const ar=a.type==='RAMP'?0:1, br=b.type==='RAMP'?0:1;
++      if(ar!==br) return ar-br;
++      return a.distanceM-b.distanceM;
++    });
++    return candidates.slice(0,Math.max(1,Number(limit)||8));
++  }
++
++  function clearLakeDiscoveryLaunchMarkers() {
++    lakeDiscoveryLaunchMarkers.forEach(m=>{ try { if(map) map.removeLayer(m); } catch(e){} });
++    lakeDiscoveryLaunchMarkers=[];
++  }
++
++  function renderLakeDiscoveryLaunchMarkers() {
++    clearLakeDiscoveryLaunchMarkers();
++    if (!map || !selectedLake || !Array.isArray(selectedLake.launches)) return;
++    selectedLake.launches.forEach((l,i)=>{
++      const m=L.circleMarker([l.lat,l.lon],{
++        radius:6,weight:2,color:l.matchQuality==='matched'?'#14885c':'#5b6fd6',
++        fillColor:'#ffffff',fillOpacity:1,bubblingMouseEvents:false,className:'lakeDiscoveryLaunchMarker'
++      }).addTo(map).bindTooltip(l.name,{direction:'top',offset:[0,-4]});
++      m.on('click',evt=>{
++        if (evt&&evt.originalEvent) L.DomEvent.stopPropagation(evt.originalEvent);
++        m.openTooltip();
++      });
++      lakeDiscoveryLaunchMarkers.push(m);
++    });
++  }
++
++  function launchDistanceLabel(l) {
++    if (!l) return '';
++    if (Number.isFinite(Number(l.gpsDistanceM))) return formatDistance(Number(l.gpsDistanceM))+' from GPS';
++    return 'GPS distance unavailable';
++  }
++
++  function renderLakeDiscoveryLaunchList() {
++    const box=$('lakeDiscoveryLaunchList');
++    if (!box) return;
++    if (!selectedLake || selectedLake.launchState==='loading') {
++      box.innerHTML='<div class="muted">Checking Wisconsin DNR public boat access…</div>';
++      return;
++    }
++    if (selectedLake.launchState==='error') {
++      box.innerHTML='<div class="error">Public launch data is unavailable right now.</div>';
++      return;
++    }
++    const launches=Array.isArray(selectedLake.launches)?selectedLake.launches:[];
++    if (!launches.length) {
++      box.innerHTML='<div class="muted">No Wisconsin DNR public boat access site was matched near this lake.</div>';
++      return;
++    }
++    box.innerHTML=launches.map((l,i)=>{
++      const type=l.type==='RAMP'?'Boat ramp':(l.type&&l.type!=='UNKNOWN'?l.type:'Public access');
++      const bits=[type];
++      if(l.rampType) bits.push('Ramp: '+l.rampType);
++      bits.push(launchDistanceLabel(l));
++      if(l.owner) bits.push(l.owner);
++      if(l.matchQuality!=='matched') bits.push('nearby access');
++      return '<div class="lakeDiscoveryLaunchRow"><div><div class="lakeDiscoveryLaunchName">'+escapeHtml(l.name)+'</div><div class="lakeDiscoveryLaunchMeta">'+bits.map(escapeHtml).join(' • ')+'</div></div><div class="lakeDiscoveryLaunchActions"><button class="btn small secondary" data-discovery-launch-show="'+i+'">SHOW</button><button class="btn small" data-discovery-launch-nav="'+i+'">NAVIGATE</button></div></div>';
++    }).join('');
++    box.querySelectorAll('[data-discovery-launch-show]').forEach(btn=>btn.addEventListener('click',()=>{
++      const i=Number(btn.dataset.discoveryLaunchShow), l=selectedLake&&selectedLake.launches&&selectedLake.launches[i];
++      if(!l||!map) return;
++      closeSheets();
++      map.setView([l.lat,l.lon],Math.max(15,map.getZoom()));
++      const m=lakeDiscoveryLaunchMarkers[i]; if(m) m.openTooltip();
++    }));
++    box.querySelectorAll('[data-discovery-launch-nav]').forEach(btn=>btn.addEventListener('click',()=>{
++      const i=Number(btn.dataset.discoveryLaunchNav), l=selectedLake&&selectedLake.launches&&selectedLake.launches[i];
++      if(l) openLaunchNavigation(l);
++    }));
++  }
++
++  async function refreshSelectedLakeLaunches(force=false) {
++    if (!selectedLake) return;
