@@ -1,0 +1,29 @@
+name: Wisconsin DNR Hydro Endpoint Probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "research/depth-data-sources" ]
+    paths:
+      - ".github/workflows/dnr-depth-probe.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe DNR endpoints
+        shell: bash
+        run: |
+          set +e
+          urls=(
+            'https://dnrmaps.wi.gov/arcgis/rest/services/ER_Biotics/ER_Biotics_WGS84_Hydro/MapServer/0?f=pjson'
+            'https://dnrmaps.wisconsin.gov/arcgis/rest/services/ER_Biotics/ER_Biotics_WGS84_Hydro/MapServer/0?f=pjson'
+            'https://dnrmaps.wisconsin.gov/arcgis/rest/services/FR_WIS_BURN/FR_WIS_BURN_MAP_EXT/MapServer/11?f=pjson'
+            'https://dnrmaps.wisconsin.gov/arcgis/rest/services/WT_SWDV/WT_Inland_Water_Resources_WTM_Ext_v2/MapServer/3?f=pjson'
+          )
+          for u in "${urls[@]}"; do
+            echo "=== $u"
+            curl -L -sS --connect-timeout 12 --max-time 20 -o /tmp/out.txt -w 'http=%{http_code} connect=%{time_connect} total=%{time_total} bytes=%{size_download}\n' "$u"
+            head -c 180 /tmp/out.txt; echo
+          done
+          exit 0
