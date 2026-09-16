@@ -1,0 +1,150 @@
++    const c=entry.center;
++    if (c && Number.isFinite(Number(c.lat)) && Number.isFinite(Number(c.lon))) return 'geo:'+Number(c.lat).toFixed(4)+','+Number(c.lon).toFixed(4);
++    return 'name:'+String(entry.name||'Unnamed Lake').toLowerCase();
++  }
++
++  function lakeLibrarySummary(lake) {
++    if (!lake) return null;
++    const center=lake.center || geojsonCenter(lake.geometry);
++    return {
++      name:lake.name||'Unnamed Lake', wbic:lake.wbic?String(lake.wbic):'', county:lake.county||'',
++      acres:Number.isFinite(Number(lake.acres))?Number(lake.acres):null,
++      center:center&&Number.isFinite(Number(center.lat))&&Number.isFinite(Number(center.lon))?{lat:Number(center.lat),lon:Number(center.lon)}:null,
++      maxDepthFt:lake.detail&&Number.isFinite(Number(lake.detail.maxDepthFt))?Number(lake.detail.maxDepthFt):null,
++      updatedAt:Date.now()
++    };
++  }
++
++  function saveLakeLibraryState() {
++    if (lakeFavorites.length>80) lakeFavorites=lakeFavorites.slice(0,80);
++    if (lakeRecents.length>30) lakeRecents=lakeRecents.slice(0,30);
++    localStorage.setItem(STORAGE_LAKE_FAVORITES,JSON.stringify(lakeFavorites));
++    localStorage.setItem(STORAGE_LAKE_RECENTS,JSON.stringify(lakeRecents));
++  }
++
++  function isLakeFavorite(entry) {
++    const key=lakeLibraryKey(entry);
++    return !!key && lakeFavorites.some(x=>lakeLibraryKey(x)===key);
++  }
++
++  function syncSelectedLakeLibraryMetadata() {
++    if (!selectedLake) return;
++    const summary=lakeLibrarySummary(selectedLake); if(!summary) return;
++    const key=lakeLibraryKey(summary);
++    const r=lakeRecents.findIndex(x=>lakeLibraryKey(x)===key);
++    if(r>=0) lakeRecents[r]=Object.assign({},lakeRecents[r],summary,{viewedAt:lakeRecents[r].viewedAt||Date.now()});
++    const f=lakeFavorites.findIndex(x=>lakeLibraryKey(x)===key);
++    if(f>=0) lakeFavorites[f]=Object.assign({},lakeFavorites[f],summary,{favoritedAt:lakeFavorites[f].favoritedAt||Date.now()});
++    saveLakeLibraryState();
++    updateLakeFavoriteButtons();
++  }
++
++  function rememberLakeRecent(lake) {
++    const summary=lakeLibrarySummary(lake); if(!summary) return;
++    const key=lakeLibraryKey(summary); if(!key) return;
++    lakeRecents=lakeRecents.filter(x=>lakeLibraryKey(x)!==key);
++    lakeRecents.unshift(Object.assign({},summary,{viewedAt:Date.now()}));
++    saveLakeLibraryState();
++  }
++
++  function toggleLakeFavorite(entry) {
++    const summary=entry===selectedLake?lakeLibrarySummary(selectedLake):Object.assign({},entry||{});
++    if(!summary) return;
++    const key=lakeLibraryKey(summary); if(!key) return;
++    const idx=lakeFavorites.findIndex(x=>lakeLibraryKey(x)===key);
++    if(idx>=0) lakeFavorites.splice(idx,1);
++    else lakeFavorites.unshift(Object.assign({},summary,{favoritedAt:Date.now()}));
++    saveLakeLibraryState();
++    updateLakeFavoriteButtons();
++    renderLakeLibrary();
++  }
++
++  function toggleSelectedLakeFavorite() { if(selectedLake) toggleLakeFavorite(selectedLake); }
++
++  function updateLakeFavoriteButtons() {
++    const active=!!selectedLake && isLakeFavorite(selectedLake);
++    const compact=$('lakeDiscoveryFavoriteBtn');
++    if(compact) { compact.textContent=active?'★':'☆'; compact.classList.toggle('active',active); compact.title=active?'Remove from favorites':'Add to favorites'; }
++    const sheet=$('lakeDiscoverySheetFavoriteBtn');
++    if(sheet) { sheet.textContent=active?'★ Favorited':'☆ Favorite'; sheet.classList.toggle('active',active); }
++  }
++
++  function libraryEntryToken(entry) {
++    const token='lib'+(++lakeLibraryEntrySeq);
++    lakeLibraryEntryMap.set(token,entry);
++    return token;
++  }
++
++  function libraryLakeRow(entry,options={}) {
++    const token=libraryEntryToken(entry);
++    const name=escapeHtml(entry.name||'Unnamed Lake');
++    const bits=[];
++    if(Number.isFinite(Number(entry.distanceM))) bits.push(formatDistance(Number(entry.distanceM))+' away');
++    if(entry.county) bits.push(escapeHtml(String(entry.county))+' County');
++    if(Number.isFinite(Number(entry.acres))) bits.push(escapeHtml(formatLakeAcres(entry.acres)));
++    if(entry.wbic) bits.push('WBIC '+escapeHtml(String(entry.wbic)));
++    const favorite=isLakeFavorite(entry);
++    return '<div class="lakeLibraryRow"><div><div class="lakeLibraryName"><strong>'+name+'</strong>'+(options.offline?'<span class="lakeLibraryOfflineBadge">offline</span>':'')+'</div><div class="lakeLibraryMeta">'+(bits.join(' • ')||'Wisconsin DNR waterbody')+'</div></div><div class="lakeLibraryRowActions">'+
++      (options.favorite===false?'':'<button class="btn small secondary lakeFavoriteBtn '+(favorite?'active':'')+'" data-library-favorite="'+token+'" aria-label="Favorite">'+(favorite?'★':'☆')+'</button>')+
++      '<button class="btn small" data-library-open="'+token+'">OPEN</button></div></div>';
++  }
++
++  function bindLakeLibraryActions(holder) {
++    if(!holder) return;
++    holder.querySelectorAll('[data-library-open]').forEach(btn=>btn.addEventListener('click',()=>openLakeLibraryEntry(lakeLibraryEntryMap.get(btn.dataset.libraryOpen))));
++    holder.querySelectorAll('[data-library-favorite]').forEach(btn=>btn.addEventListener('click',()=>toggleLakeFavorite(lakeLibraryEntryMap.get(btn.dataset.libraryFavorite))));
++    holder.querySelectorAll('[data-library-offline-open]').forEach(btn=>btn.addEventListener('click',()=>openOfflineLake(btn.dataset.libraryOfflineOpen)));
++  }
++
++  function getOfflineLakeSummaries() {
++    if(!(window.Android&&Android.listOfflineLakes)) return [];
++    try { const rows=JSON.parse(Android.listOfflineLakes()||'[]'); return Array.isArray(rows)?rows:[]; } catch(e) { return []; }
++  }
++
++  function renderLakeLibraryOffline() {
++    const holder=$('lakeLibraryOffline'); if(!holder) return;
++    const rows=getOfflineLakeSummaries().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
++    if($('lakeLibraryOfflineCount')) $('lakeLibraryOfflineCount').textContent=String(rows.length);
++    if(!rows.length) { holder.innerHTML='<div class="lakeLibraryEmpty">No offline lake packages saved yet.</div>'; return; }
++    holder.innerHTML=rows.map(l=>'<div class="lakeLibraryRow"><div><div class="lakeLibraryName"><strong>'+escapeHtml(l.name||'Saved lake')+'</strong><span class="lakeLibraryOfflineBadge">offline</span></div><div class="lakeLibraryMeta">WBIC '+escapeHtml(String(l.wbic||''))+(l.hasBathymetry?' • Bathymetry saved':'')+(l.hasOffline3d?' • 3D saved':'')+'</div></div><div class="lakeLibraryRowActions"><button class="btn small" data-library-offline-open="'+escapeHtml(String(l.wbic||''))+'">OPEN</button></div></div>').join('');
++    bindLakeLibraryActions(holder);
++  }
++
++  function renderLakeLibrary() {
++    lakeLibraryEntryMap=new Map(); lakeLibraryEntrySeq=0;
++    const fav=$('lakeLibraryFavorites'), rec=$('lakeLibraryRecents'), near=$('lakeLibraryNearby');
++    if($('lakeLibraryFavoriteCount')) $('lakeLibraryFavoriteCount').textContent=String(lakeFavorites.length);
++    if($('lakeLibraryRecentCount')) $('lakeLibraryRecentCount').textContent=String(lakeRecents.length);
++    if(fav) { fav.innerHTML=lakeFavorites.length?lakeFavorites.slice(0,12).map(x=>libraryLakeRow(x)).join(''):'<div class="lakeLibraryEmpty">Favorite a lake from Lake Discovery and it will stay here.</div>'; bindLakeLibraryActions(fav); }
++    if(rec) { rec.innerHTML=lakeRecents.length?lakeRecents.slice(0,10).map(x=>libraryLakeRow(x)).join(''):'<div class="lakeLibraryEmpty">Lakes you explore will appear here automatically.</div>'; bindLakeLibraryActions(rec); }
++    if(near) { near.innerHTML=lakeNearby.length?lakeNearby.slice(0,12).map(x=>libraryLakeRow(x)).join(''):'<div class="lakeLibraryEmpty">'+(currentLoc?'Tap Refresh to find Wisconsin lakes around your current position.':'A GPS fix is needed to find nearby lakes.')+'</div>'; bindLakeLibraryActions(near); }
++    const radius=$('lakeLibraryNearbyRadius'); if(radius) radius.value=String(lakeNearbyRadiusMiles);
++    renderLakeLibraryOffline();
++  }
++
++  async function openLakeLibraryEntry(entry) {
++    if(!entry) return;
++    closeSheets();
++    try {
++      if(entry.wbic) await loadLakeDiscovery({name:entry.name,wbic:String(entry.wbic),discoveredBy:'library'},entry.center||null,true,null);
++      else if(entry.feature) await loadLakeDiscovery({name:entry.name,wbic:'',discoveredBy:'library'},entry.center||null,true,entry.feature);
++      else if(entry.center) { if(map) map.setView([entry.center.lat,entry.center.lon],14); await discoverLakeAt(entry.center.lat,entry.center.lon); }
++    } catch(e) { if(window.Android&&Android.toast) Android.toast('Could not open lake'); }
++  }
++
++  async function refreshLakeLibraryNearby(force=true) {
++    const holder=$('lakeLibraryNearby'), status=$('lakeLibraryNearbyStatus');
++    if(!currentLoc || !Number.isFinite(Number(currentLoc.lat)) || !Number.isFinite(Number(currentLoc.lon))) {
++      lakeNearby=[]; if(status) status.textContent='GPS fix required for nearby lakes.'; renderLakeLibrary(); return;
++    }
++    const requestId=++lakeNearbyRequestId;
++    if(status) status.textContent='Searching Wisconsin DNR within '+lakeNearbyRadiusMiles+' miles…';
++    if(holder) holder.innerHTML='<div class="lakeLibraryEmpty">Finding nearby Wisconsin lakes…</div>';
++    const lat=Number(currentLoc.lat), lon=Number(currentLoc.lon), r=Number(lakeNearbyRadiusMiles)||25;
++    const latPad=r/69.0, lonPad=r/(69.0*Math.max(.25,Math.cos(lat*Math.PI/180)));
++    const envelope=[lon-lonPad,lat-latPad,lon+lonPad,lat+latPad].map(x=>Number(x).toFixed(6)).join(',');
++    const url=dnrLakeQueryBase()+'where='+encodeURIComponent('HYDROTYPE IN (706,707,710)')+
++      '&geometry='+encodeURIComponent(envelope)+'&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects'+
++      '&outFields='+encodeURIComponent('OBJECTID,WATERBODY_NAME,WATERBODY_ROW_NAME,WATERBODY_WBIC,HYDROTYPE')+
++      '&returnGeometry=true&outSR=4326&geometryPrecision=5&maxAllowableOffset=0.0003&resultRecordCount=500&f=geojson';
++    try {
