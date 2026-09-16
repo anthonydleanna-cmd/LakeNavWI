@@ -1,0 +1,125 @@
+       if(!l||!map) return;
+       closeSheets();
+       map.setView([l.lat,l.lon],Math.max(15,map.getZoom()));
+-      const m=lakeDiscoveryLaunchMarkers[i]; if(m) m.openTooltip();
++      const m=lakeDiscoveryLaunchMarkers[i]; if(m) m.openPopup();
+     }));
+     box.querySelectorAll('[data-discovery-launch-nav]').forEach(btn=>btn.addEventListener('click',()=>{
+       const i=Number(btn.dataset.discoveryLaunchNav), l=selectedLake&&selectedLake.launches&&selectedLake.launches[i];
+@@ -6925,6 +6979,144 @@
+     }));
+   }
+ 
++
++  window.onNativeDnrText = function(requestId,ok,text,error) {
++    const pending=nativeDnrRequests.get(String(requestId));
++    if(!pending) return;
++    nativeDnrRequests.delete(String(requestId));
++    if(ok) pending.resolve(String(text||''));
++    else pending.reject(new Error(error||'Wisconsin DNR request failed.'));
++  };
++
++  function fetchDnrHtml(url) {
++    if (window.Android && typeof Android.fetchDnrText==='function') {
++      return new Promise((resolve,reject)=>{
++        const id='dnr-'+(++nativeDnrRequestSeq)+'-'+Date.now();
++        const timer=setTimeout(()=>{ if(nativeDnrRequests.delete(id)) reject(new Error('Wisconsin DNR request timed out.')); },18000);
++        nativeDnrRequests.set(id,{resolve:text=>{clearTimeout(timer);resolve(text);},reject:err=>{clearTimeout(timer);reject(err);}});
++        try { Android.fetchDnrText(id,url); } catch(e) { clearTimeout(timer); nativeDnrRequests.delete(id); reject(e); }
++      });
++    }
++    return fetch(url,{cache:'no-store'}).then(r=>{ if(!r.ok) throw new Error('DNR HTTP '+r.status); return r.text(); });
++  }
++
++  function lakeDnrDetailUrl(lake) {
++    return lake&&lake.wbic ? 'https://apps.dnr.wi.gov/lakes/lakepages/LakeDetail.aspx?wbic='+encodeURIComponent(lake.wbic) : '';
++  }
++
++  function lakeFishingRegulationsUrl(lake) {
++    if(!lake||!lake.wbic) return '';
++    return 'https://apps.dnr.wi.gov/fisheriesmanagement/Public/LakeRegulation/Details?WBIC='+encodeURIComponent(lake.wbic)+'&WBIC_NAME='+encodeURIComponent(lake.name||'');
++  }
++
++  function parseDnrFishInfoHtml(html) {
++    const doc=new DOMParser().parseFromString(String(html||''),'text/html');
++    const species=[];
++    const headings=[...doc.querySelectorAll('h2,h3,h4')];
++    const fishHead=headings.find(el=>/^fish$/i.test((el.textContent||'').trim()));
++    if(fishHead) {
++      let el=fishHead.nextElementSibling, guard=0;
++      while(el&&guard++<6&&!/^H[1-6]$/i.test(el.tagName)) {
++        const lis=[...el.querySelectorAll('li')];
++        lis.forEach(li=>{
++          const raw=(li.textContent||'').replace(/\s+/g,' ').trim();
++          const m=raw.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
++          if(raw) species.push({name:(m?m[1]:raw).trim(),abundance:m?m[2].trim():''});
++        });
++        if(species.length) break;
++        el=el.nextElementSibling;
++      }
++    }
++    if(!species.length) {
++      const text=(doc.body&&doc.body.textContent||'').replace(/\s+/g,' ');
++      const m=text.match(/Fish include\s+(.+?)\.\s/i);
++      if(m) m[1].split(/,|\sand\s/i).map(x=>x.trim()).filter(Boolean).forEach(name=>species.push({name,abundance:''}));
++    }
++    const pageText=(doc.body&&doc.body.textContent||'').replace(/\s+/g,' ');
++    const clarityMatch=pageText.match(/water is\s+([^\.]+?clear)\./i);
++    return {species:species.slice(0,16),clarity:clarityMatch?clarityMatch[1].trim():''};
++  }
++
++  function parseDnrRegulationsHtml(html,actualSpecies) {
++    const doc=new DOMParser().parseFromString(String(html||''),'text/html');
++    const rows=[];
++    doc.querySelectorAll('table tr').forEach(tr=>{
++      const td=[...tr.querySelectorAll('td')];
++      if(td.length<3) return;
++      const fish=(td[0].textContent||'').replace(/\s+/g,' ').trim();
++      const season=(td[1].textContent||'').replace(/\s+/g,' ').trim();
++      const regulation=(td[2].textContent||'').replace(/\s+/g,' ').trim();
++      if(fish&&season&&regulation) rows.push({fish,season,regulation});
++    });
++    const normals=(actualSpecies||[]).map(s=>String(s.name||s).toLowerCase());
++    const aliases={
++      'largemouth bass':'largemouth bass','smallmouth bass':'smallmouth bass','northern pike':'northern pike','walleye':'walleye',
++      'musky':'muskellunge','muskellunge':'muskellunge','panfish':'panfish','trout':'trout','catfish':'catfish','sturgeon':'sturgeon'
++    };
++    const wanted=new Set();
++    normals.forEach(n=>Object.keys(aliases).forEach(k=>{ if(n.includes(k)) wanted.add(aliases[k]); }));
++    let key=rows.filter(r=>{ const n=r.fish.toLowerCase(); return [...wanted].some(w=>n.includes(w)); });
++    if(!key.length) key=rows.filter(r=>/panfish|walleye|bass|northern pike|muskell|trout|catfish|sturgeon/i.test(r.fish));
++    const seen=new Set();
++    key=key.filter(r=>{ const k=r.fish.toLowerCase(); if(seen.has(k)) return false; seen.add(k); return true; }).slice(0,8);
++    const bodyText=(doc.body&&doc.body.textContent||'').replace(/\s+/g,' ');
++    const general=[];
++    const bass=bodyText.match(/Catch and release fishing for largemouth and smallmouth bass[^\.]*\./i); if(bass) general.push(bass[0]);
++    const troll=bodyText.match(/Motor Trolling is allowed[^\.]*\./i); if(troll) general.push(troll[0]);
++    return {rows:key,totalRows:rows.length,general};
++  }
++
++  function renderLakeFishingInfo() {
++    const speciesBox=$('lakeFishSpecies'), regStatus=$('lakeFishingRegStatus'), regList=$('lakeFishingRegList'), source=$('lakeFishingSourceLine');
++    if(!speciesBox||!regStatus||!regList) return;
++    if(!selectedLake || selectedLake.fishingState==='loading') {
++      speciesBox.innerHTML='<div class="lakeFishEmpty">Checking DNR-reported fish species…</div>';
++      regStatus.textContent='Checking lake-specific fishing regulations…'; regList.innerHTML='';
++      if(source) source.textContent='Wisconsin DNR lake and fisheries information.';
++      return;
++    }
++    if(selectedLake.fishingState==='unavailable') {
++      speciesBox.innerHTML='<div class="lakeFishEmpty">No WBIC-linked DNR fish inventory is available for this waterbody.</div>';
++      regStatus.textContent='Lake-specific fishing regulations could not be matched.'; regList.innerHTML='';
++      return;
++    }
++    const info=selectedLake.fishingInfo||{};
++    const species=Array.isArray(info.species)?info.species:[];
++    speciesBox.innerHTML=species.length ? '<div class="lakeFishChips">'+species.map(s=>'<span class="lakeFishChip">'+escapeHtml(s.name)+(s.abundance?'<small>'+escapeHtml(s.abundance)+'</small>':'')+'</span>').join('')+'</div>' : '<div class="lakeFishEmpty">The DNR lake page did not list fish species for this waterbody.</div>';
++    const regs=info.regulations||{};
++    const statusBits=[];
++    if(info.clarity) statusBits.push('Water clarity: '+info.clarity);
++    if(regs.totalRows) statusBits.push(regs.totalRows+' DNR regulation entries');
++    regStatus.textContent=statusBits.length?statusBits.join(' • '):'Open the DNR regulation page for the current rules.';
++    const general=Array.isArray(regs.general)?regs.general:[];
++    const rows=Array.isArray(regs.rows)?regs.rows:[];
++    regList.innerHTML=(general.length?'<div class="lakeRegRow"><div class="lakeRegFish">General waterbody restrictions</div><div class="lakeRegText">'+general.map(escapeHtml).join(' ')+'</div></div>':'')+rows.map(r=>'<div class="lakeRegRow"><div class="lakeRegFish">'+escapeHtml(r.fish)+'</div><div class="lakeRegSeason">'+escapeHtml(r.season)+'</div><div class="lakeRegText">'+escapeHtml(r.regulation)+'</div></div>').join('');
++    if(source) source.textContent='DNR-reported fish + live inland-lake regulations for this WBIC.';
