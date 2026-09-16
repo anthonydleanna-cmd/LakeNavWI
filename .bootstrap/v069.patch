@@ -1,0 +1,193 @@
+--- a/app/src/main/assets/index.html
++++ b/app/src/main/assets/index.html
+@@ -930,6 +930,7 @@
+ #mapWrap.navGpsPinned .leaflet-marker-pane .boatMarker { z-index:1000 !important; }
+ 
+ /* v0.68 route dark-mode polish + swipe-down sheet gestures */
++/* v0.69 wind readout-only mode */
+ html.darkMode body .routeItem { background:#102936; border-color:#294653; color:#eaf5f8; box-shadow:0 6px 18px rgba(0,0,0,.18); }
+ html.darkMode body .routeName { color:#f1f8fa; }
+ html.darkMode body .routeMeta { color:#9db0ba; }
+@@ -955,7 +956,7 @@
+ <div id="app">
+   <div id="statusbar">
+     <div>
+-      <div id="brand">LakeNav WI <span class="versionPill">v0.68</span></div>
++      <div id="brand">LakeNav WI <span class="versionPill">v0.69</span></div>
+       <div id="gpsState">Waiting for GPS...</div>
+       <button id="gpsQualityChip" class="gpsQualityChip noFix" type="button" aria-label="GPS quality"><span class="gpsQualityDot"></span><span id="gpsQualityText">NO FIX</span></button>
+     </div>
+@@ -1010,7 +1011,7 @@
+     </div>
+     <div id="weatherQuickPanel" role="dialog" aria-label="Quick weather layers">
+       <div class="quickTitle"><strong>Weather</strong><button class="closeBtn" id="quickWeatherClose" aria-label="Close weather">x</button></div>
+-      <div class="quickLayerRow"><div class="quickLayerText">Wind<small>Animated direction + selected speed labels</small></div><label class="toggleSwitch"><input type="checkbox" id="quickWindToggle"><span></span></label></div>
++      <div class="quickLayerRow"><div class="quickLayerText">Wind<small id="quickWindModeText">Speed + direction readout with optional animation</small></div><label class="toggleSwitch"><input type="checkbox" id="quickWindToggle"><span></span></label></div>
+       <div class="quickLayerRow"><div class="quickLayerText">Wave height<small>Simple height dots across the visible water</small></div><label class="toggleSwitch"><input type="checkbox" id="quickWaveToggle"><span></span></label></div>
+       <div class="quickLayerRow"><div class="quickLayerText">Weather radar<small>Adaptive-opacity precipitation loop</small></div><label class="toggleSwitch"><input type="checkbox" id="quickRadarToggle"><span></span></label></div>
+       <div class="quickLayerRow"><div class="quickLayerText">Lightning risk<small>Modeled lightning density in your selected range</small></div><label class="toggleSwitch"><input type="checkbox" id="quickLightningToggle"><span></span></label></div>
+@@ -1281,8 +1282,12 @@
+         <span class="muted">Marine symbols</span>
+       </div>
+       <div class="row">
+-        <label class="switchLine"><input type="checkbox" id="windToggle" /> Animated wind</label>
+-        <span class="muted">Open-Meteo model</span>
++        <label class="switchLine"><input type="checkbox" id="windToggle" /> Wind speed + direction</label>
++        <span class="muted">Bottom readout</span>
++      </div>
++      <div class="row">
++        <label class="switchLine"><input type="checkbox" id="windAnimationToggle" /> Animate wind field</label>
++        <span class="muted">Moving map arrows</span>
+       </div>
+       <div class="row">
+         <label class="switchLine"><input type="checkbox" id="waveToggle" /> Wave height</label>
+@@ -1296,7 +1301,7 @@
+         <label class="switchLine"><input type="checkbox" id="lightningToggle" /> Lightning risk</label>
+         <span class="muted">Modeled, selected radius</span>
+       </div>
+-      <div class="warn">Depth colors use NOAA ENC depth-area polygons where coverage exists. Hazards + nav aids adds marine symbols. Wind uses moving direction arrows that scale continuously with the visible map span, with a few speed labels for quick reading. Waves are simplified to a small set of modeled significant-wave-height dots so the chart stays readable. Radar loops recent precipitation frames with adaptive navigation opacity and soft frame blending; the public feed is historical/recent imagery rather than true live interpolation and is not a substitute for official warnings or visual conditions. Most inland Wisconsin lakes still rely on the DNR reference contour sheet because those scans are not safely GPS-aligned.</div>
++      <div class="warn">Depth colors use NOAA ENC depth-area polygons where coverage exists. Hazards + nav aids adds marine symbols. Wind can show a compact speed + direction readout at the bottom of the chart; the moving direction-arrow field is optional and can be turned off independently. Waves are simplified to a small set of modeled significant-wave-height dots so the chart stays readable. Radar loops recent precipitation frames with adaptive navigation opacity and soft frame blending; the public feed is historical/recent imagery rather than true live interpolation and is not a substitute for official warnings or visual conditions. Most inland Wisconsin lakes still rely on the DNR reference contour sheet because those scans are not safely GPS-aligned.</div>
+     </div>
+ 
+     <div class="card">
+@@ -1428,6 +1433,7 @@
+   const STORAGE_DEPTH_SHADE = 'lakenav.depthshade.v1';
+   const STORAGE_HEADING_MODE = 'lakenav.headingmode.v1';
+   const STORAGE_WIND = 'lakenav.wind.v1';
++  const STORAGE_WIND_ANIMATION = 'lakenav.wind.animation.v1';
+   const STORAGE_WAVES = 'lakenav.waves.v1';
+   const STORAGE_RADAR = 'lakenav.radar.v1';
+   const STORAGE_MOB_SMS = 'lakenav.mob.sms.v1';
+@@ -1501,6 +1507,7 @@
+   let orientationMode = localStorage.getItem(STORAGE_ORIENTATION) === 'courseup' ? 'courseup' : 'northup';
+   let headingMode = ['auto','gps','compass'].includes(localStorage.getItem(STORAGE_HEADING_MODE)) ? localStorage.getItem(STORAGE_HEADING_MODE) : 'auto';
+   let windEnabled = localStorage.getItem(STORAGE_WIND) === '1';
++  let windAnimationEnabled = localStorage.getItem(STORAGE_WIND_ANIMATION) !== '0';
+   let waveEnabled = localStorage.getItem(STORAGE_WAVES) === '1';
+   let radarEnabled = localStorage.getItem(STORAGE_RADAR) === '1';
+   let windGrid = null;
+@@ -2363,7 +2370,7 @@
+       if (!silent && window.Android && Android.toast) Android.toast('3D chart preview enabled');
+     } else {
+       applyMapOrientation();
+-      if (windEnabled && appPageVisible && !offlineMode) animateWind();
++      if (windEnabled && windAnimationEnabled && appPageVisible && !offlineMode) animateWind();
+       if (waveEnabled) drawWaveOverlay();
+       if (map) setTimeout(() => { try { map.invalidateSize(); } catch(e) {} }, 50);
+       if (!silent && window.Android && Android.toast) Android.toast('2D chart enabled');
+@@ -5658,6 +5665,8 @@
+     if ($('quickHazardToggle')) $('quickHazardToggle').checked = hazardLayerEnabled;
+     if ($('windToggle')) $('windToggle').checked = windEnabled;
+     if ($('quickWindToggle')) $('quickWindToggle').checked = windEnabled;
++    if ($('windAnimationToggle')) { $('windAnimationToggle').checked = windAnimationEnabled; $('windAnimationToggle').disabled = !windEnabled; }
++    if ($('quickWindModeText')) $('quickWindModeText').textContent = windAnimationEnabled ? 'Speed + direction readout with animated map arrows' : 'Speed + direction readout only';
+     if ($('waveToggle')) $('waveToggle').checked = waveEnabled;
+     if ($('quickWaveToggle')) $('quickWaveToggle').checked = waveEnabled;
+     if ($('radarToggle')) $('radarToggle').checked = radarEnabled;
+@@ -5809,7 +5818,7 @@
+       });
+       windGrid = { rows, cols, south:bounds.south, north:bounds.north, west:bounds.west, east:bounds.east, samples };
+       windLastFetch = Date.now();
+-      resetWindParticles();
++      if (windAnimationEnabled) resetWindParticles();
+       windResampling = false;
+       const center = map ? map.getCenter() : currentLoc;
+       const w = center ? windAt(center.lat, center.lng != null ? center.lng : center.lon) : null;
+@@ -5821,12 +5830,12 @@
+       const label = Math.round(speed) + ' mph' + (from != null ? ' ' + compassNameFromWind(from) : '') + (gust != null ? ' • gust ' + Math.round(gust) : '');
+       $('windChipText').textContent = 'Wind ' + label;
+       $('windChip').style.display = windEnabled ? 'block' : 'none';
+-      if ($('quickWindStatus')) $('quickWindStatus').innerHTML = '<strong>Modeled wind:</strong> ' + escapeHtml(label) + '<br>Animated 10 m wind field • Open-Meteo data.';
++      if ($('quickWindStatus')) $('quickWindStatus').innerHTML = '<strong>Modeled wind:</strong> ' + escapeHtml(label) + '<br>' + (windAnimationEnabled ? 'Animated 10 m wind field' : 'Bottom readout only') + ' • Open-Meteo data.';
+     } catch (e) {
+       windGrid = previousGrid || null;
+       windResampling = false;
+       if (windGrid) {
+-        resetWindParticles();
++        if (windAnimationEnabled) resetWindParticles();
+         if ($('quickWindStatus')) $('quickWindStatus').textContent = 'Wind refresh unavailable; showing the last modeled field for its verified area.';
+         $('windChipText').textContent = 'Wind • cached field';
+       } else {
+@@ -5939,7 +5948,7 @@
+     let last = performance.now();
+     let lastPaint = 0;
+     const frame = now => {
+-      if (!windEnabled) return;
++      if (!windEnabled || !windAnimationEnabled) return;
+       if (!appPageVisible || mapMode !== '2d') { windAnimationFrame=requestAnimationFrame(frame); return; }
+       if (now-lastPaint < 32) { windAnimationFrame=requestAnimationFrame(frame); return; }
+       lastPaint=now;
+@@ -5974,25 +5983,51 @@
+     windAnimationFrame = requestAnimationFrame(frame);
+   }
+ 
++  function setWindAnimation(on) {
++    windAnimationEnabled = !!on;
++    localStorage.setItem(STORAGE_WIND_ANIMATION, windAnimationEnabled ? '1' : '0');
++    if ($('windAnimationToggle')) $('windAnimationToggle').checked = windAnimationEnabled;
++    if ($('quickWindModeText')) $('quickWindModeText').textContent = windAnimationEnabled ? 'Speed + direction readout with animated map arrows' : 'Speed + direction readout only';
++    if (!windEnabled) {
++      if ($('windAnimationToggle')) $('windAnimationToggle').disabled = true;
++      return;
++    }
++    const canvas = $('windCanvas');
++    if (!windAnimationEnabled) {
++      cancelAnimationFrame(windAnimationFrame); windAnimationFrame = 0;
++      if (canvas) canvas.style.display = 'none';
++      const view = resizeWindCanvas(); if (view) view.ctx.clearRect(0,0,view.width,view.height);
++      if ($('quickWindStatus')) $('quickWindStatus').textContent = 'Wind readout only. Speed and direction stay visible at the bottom without map animation.';
++      return;
++    }
++    if (canvas) canvas.style.display = mapMode === '2d' ? 'block' : 'none';
++    if (windGrid) resetWindParticles();
++    if (!offlineMode && appPageVisible && mapMode === '2d') animateWind();
++    if ($('quickWindStatus')) $('quickWindStatus').textContent = 'Wind animation on. Bottom speed and direction readout remains visible.';
++  }
++
+   function toggleWindOverlay(on) {
+     windEnabled = !!on;
+     localStorage.setItem(STORAGE_WIND, windEnabled ? '1' : '0');
+     if ($('windToggle')) $('windToggle').checked = windEnabled;
+     if ($('quickWindToggle')) $('quickWindToggle').checked = windEnabled;
+-    $('windCanvas').style.display = windEnabled ? 'block' : 'none';
++    if ($('windAnimationToggle')) { $('windAnimationToggle').checked = windAnimationEnabled; $('windAnimationToggle').disabled = !windEnabled; }
++    if ($('quickWindModeText')) $('quickWindModeText').textContent = windAnimationEnabled ? 'Speed + direction readout with animated map arrows' : 'Speed + direction readout only';
++    $('windCanvas').style.display = windEnabled && windAnimationEnabled && mapMode === '2d' ? 'block' : 'none';
+     $('windChip').style.display = windEnabled ? 'block' : 'none';
+     if (!windEnabled) {
+-      cancelAnimationFrame(windAnimationFrame);
++      cancelAnimationFrame(windAnimationFrame); windAnimationFrame = 0;
+       const view = resizeWindCanvas(); if (view) view.ctx.clearRect(0,0,view.width,view.height);
+-      if ($('quickWindStatus')) $('quickWindStatus').textContent = 'Wind overlay off. Auto heading prioritizes actual GPS movement; phone compass is mainly a stopped fallback.';
++      if ($('quickWindStatus')) $('quickWindStatus').textContent = 'Wind display off.';
+       return;
+     }
+     if (offlineMode) {
+-      if ($('quickWindStatus')) $('quickWindStatus').textContent = 'Wind animation needs data service. It is disabled while Offline mode is active.';
++      if ($('quickWindStatus')) $('quickWindStatus').textContent = 'Wind data needs data service and is unavailable while Offline mode is active.';
+       return;
+     }
+     refreshWindForCurrentView(true);
+-    animateWind();
++    if (windAnimationEnabled) animateWind();
++    else if ($('quickWindStatus')) $('quickWindStatus').textContent = 'Wind readout only. Loading speed and direction for the bottom display…';
+   }
+ 
+   function scheduleWaveRefresh() {
+@@ -6450,7 +6485,7 @@
+       if (map && baseLayer && !map.hasLayer(baseLayer)) baseLayer.addTo(map);
+       if (map && hazardLayerEnabled && hazardLayer && !map.hasLayer(hazardLayer)) hazardLayer.addTo(map);
+       $('chartChip').textContent = 'OSM map';
+-      if (windEnabled) { $('windCanvas').style.display='block'; toggleWindOverlay(true); }
++      if (windEnabled) { $('windCanvas').style.display=windAnimationEnabled?'block':'none'; toggleWindOverlay(true); }
+       if (waveEnabled) { $('waveCanvas').style.display='block'; toggleWaveOverlay(true); }
+       if (radarEnabled) toggleRadarOverlay(true);
+       if (lightningEnabled) toggleLightningRisk(true);
+@@ -7626,6 +7661,7 @@
+     $('depthShadeToggle').addEventListener('change', e => toggleDepthShading(e.target.checked));
+     $('hazardToggle').addEventListener('change', e => { toggleHazards(e.target.checked); syncLayerControls(); });
+     $('windToggle').addEventListener('change', e => { toggleWindOverlay(e.target.checked); syncLayerControls(); });
++    $('windAnimationToggle').addEventListener('change', e => { setWindAnimation(e.target.checked); syncLayerControls(); });
+     $('waveToggle').addEventListener('change', e => { toggleWaveOverlay(e.target.checked); syncLayerControls(); });
+     $('radarToggle').addEventListener('change', e => { toggleRadarOverlay(e.target.checked); syncLayerControls(); });
+     $('lightningToggle').addEventListener('change', e => { toggleLightningRisk(e.target.checked); syncLayerControls(); });
