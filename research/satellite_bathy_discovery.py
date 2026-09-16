@@ -2,13 +2,13 @@
 import json
 import os
 from pathlib import Path
-from urllib.parse import urlencode
 
 import geopandas as gpd
 import requests
 
 OUT = Path(os.environ.get("SAT_BATHY_OUT", "research_output"))
 OUT.mkdir(parents=True, exist_ok=True)
+NTL_ROOT = Path(os.environ.get("NTL_REFERENCE_ROOT", "ntl-reference"))
 
 LAKES = {
     "Crystal Lake": (46.00275, -89.612233),
@@ -47,11 +47,7 @@ def get_tracks(bounds):
     }
     url = f"{OA_BASE}/api/icesat2/getTracks"
     r = session.get(url, params=params, timeout=90)
-    return {
-        "request_url": r.url,
-        "status": r.status_code,
-        "data": safe_json(r),
-    }
+    return {"request_url": r.url, "status": r.status_code, "data": safe_json(r)}
 
 
 def stac_search(bounds):
@@ -90,8 +86,8 @@ def stac_search(bounds):
 
 
 def inspect_bathymetry():
-    shp = Path("/tmp/NTLlakeloads/data-raw/ntl153_v3_0/nhld_bathymetry.shp")
-    out = {"exists": shp.exists()}
+    shp = NTL_ROOT / "data-raw/ntl153_v3_0/nhld_bathymetry.shp"
+    out = {"exists": shp.exists(), "path": str(shp)}
     if not shp.exists():
         return out
     gdf = gpd.read_file(shp)
