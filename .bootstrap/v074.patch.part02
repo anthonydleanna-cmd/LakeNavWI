@@ -1,0 +1,117 @@
++    if (!force && selectedLake.launchState==='ready') { renderLakeDiscoveryLaunchList(); return; }
++    const requestId=++lakeDiscoveryLaunchRequestId;
++    const key=String(selectedLake.wbic||'')+'|'+String(selectedLake.name||'');
++    selectedLake.launchState='loading';
++    selectedLake.launches=[];
++    updateLakeDiscoveryUi();
++    renderLakeDiscoveryLaunchList();
++    try {
++      const launches=await findBoatLaunchesForSelectedLake(8);
++      if(requestId!==lakeDiscoveryLaunchRequestId || !selectedLake || (String(selectedLake.wbic||'')+'|'+String(selectedLake.name||''))!==key) return;
++      selectedLake.launches=launches;
++      selectedLake.launchState='ready';
++      renderLakeDiscoveryLaunchMarkers();
++      updateLakeDiscoveryUi();
++      renderLakeDiscoveryLaunchList();
++    } catch(e) {
++      if(requestId!==lakeDiscoveryLaunchRequestId || !selectedLake) return;
++      selectedLake.launchState='error';
++      selectedLake.launches=[];
++      clearLakeDiscoveryLaunchMarkers();
++      updateLakeDiscoveryUi();
++      renderLakeDiscoveryLaunchList();
++    }
++  }
+ 
+-    // Prefer a true ramp when the DNR lists one; otherwise fall back to the closest public access.
+-    const ramps=candidates.filter(c=>c.type==='RAMP');
+-    if (ramps.length) candidates=ramps;
+-    candidates.sort((a,b)=>a.distanceM-b.distanceM);
++  async function findClosestBoatLaunchForSelectedLake() {
++    if (!selectedLake) throw new Error('Select a lake first.');
++    let candidates=(selectedLake.launchState==='ready'&&Array.isArray(selectedLake.launches))?selectedLake.launches:await findBoatLaunchesForSelectedLake(8);
++    if (!candidates.length) throw new Error('No public boat access site was found near this lake in the Wisconsin DNR database.');
++    if (currentLoc) {
++      candidates=candidates.map(c=>Object.assign({},c,{gpsDistanceM:distanceMeters(currentLoc.lat,currentLoc.lon,c.lat,c.lon)}));
++      candidates.forEach(c=>c.distanceM=c.gpsDistanceM);
++      candidates.sort((a,b)=>a.distanceM-b.distanceM);
++    }
+     return candidates[0];
+   }
+ 
+@@ -6893,6 +7028,25 @@
+     if (!on) card.classList.remove('loading');
+   }
+ 
++
++  function clearSelectedLakeDiscovery() {
++    lakeDiscoveryRequestId++;
++    lakeDiscoveryLaunchRequestId++;
++    if (selectedLakeLayer && map) { try { map.removeLayer(selectedLakeLayer); } catch(e){} }
++    selectedLakeLayer=null;
++    selectedLake=null;
++    clearLakeDiscoveryLaunchMarkers();
++    setLakeDiscoveryCardVisible(false);
++    const sheet=$('lakeDiscoverySheet'); if(sheet) sheet.classList.remove('open');
++    if ($('selectedLakeChip')) $('selectedLakeChip').style.display='none';
++    if ($('selectedLakeChipName')) $('selectedLakeChipName').textContent='--';
++    updateSelectedLakeUi();
++    resetVerifiedDepthSurface();
++    clearOpticalShallowsLayer();
++    if (opticalShallowsEnabled) opticalShallowsSetStatus('Select a Wisconsin lake to analyze recent Sentinel-2 imagery.');
++    if (depthShadeEnabled) scheduleDepthShadeRefresh();
++  }
++
+   function formatLakeAcres(value) {
+     const n=Number(value);
+     if (!Number.isFinite(n) || n<=0) return 'Not reported';
+@@ -6926,6 +7080,11 @@
+     if ($('lakeDiscoveryMeta')) $('lakeDiscoveryMeta').textContent=meta;
+     applyDiscoveryBadge($('lakeDiscoveryDepthBadge'),depth);
+     applyDiscoveryBadge($('lakeDiscoverySheetDepthBadge'),depth);
++    const launches=Array.isArray(selectedLake.launches)?selectedLake.launches:[];
++    const launchInfo=selectedLake.launchState==='ready' ? (launches.length?{text:'LAUNCHES • '+launches.length,cls:'good'}:{text:'NO DNR LAUNCH',cls:'mutedBadge'}) : (selectedLake.launchState==='error'?{text:'LAUNCHES • UNAVAILABLE',cls:'warn'}:{text:'LAUNCHES • CHECKING',cls:'mutedBadge'});
++    applyDiscoveryBadge($('lakeDiscoveryLaunchBadge'),launchInfo);
++    applyDiscoveryBadge($('lakeDiscoverySheetLaunchBadge'),launchInfo);
++    if ($('lakeDiscoveryLaunchBtn')) $('lakeDiscoveryLaunchBtn').textContent=launches.length ? (launches.length+' LAUNCH'+(launches.length===1?'':'ES')) : 'LAUNCHES';
+     if ($('lakeDiscoverySourceBadge')) $('lakeDiscoverySourceBadge').textContent=selectedLake.wbic?'DNR • WBIC MATCH':'DNR • HYDRO ONLY';
+     if ($('lakeDiscoverySheetSourceBadge')) $('lakeDiscoverySheetSourceBadge').textContent=selectedLake.wbic?'DNR • WBIC MATCH':'DNR • HYDRO ONLY';
+     if ($('lakeDiscoverySheetTitle')) $('lakeDiscoverySheetTitle').textContent=selectedLake.name||'Unnamed Lake';
+@@ -6949,6 +7108,7 @@
+     if ($('lakeDiscoveryName')) $('lakeDiscoveryName').textContent=name||'Identifying lake…';
+     if ($('lakeDiscoveryMeta')) $('lakeDiscoveryMeta').textContent='Wisconsin DNR hydrography';
+     if ($('lakeDiscoveryDepthBadge')) { $('lakeDiscoveryDepthBadge').textContent='DEPTH • CHECKING'; $('lakeDiscoveryDepthBadge').className='lakeDiscoveryBadge mutedBadge'; }
++    if ($('lakeDiscoveryLaunchBadge')) { $('lakeDiscoveryLaunchBadge').textContent='LAUNCHES • CHECKING'; $('lakeDiscoveryLaunchBadge').className='lakeDiscoveryBadge mutedBadge'; }
+     if ($('lakeDiscoverySourceBadge')) $('lakeDiscoverySourceBadge').textContent='DNR • LOOKUP';
+     if ($('lakeDiscoveryExploreBtn')) $('lakeDiscoveryExploreBtn').disabled=true;
+     if ($('lakeDiscoveryLaunchBtn')) $('lakeDiscoveryLaunchBtn').disabled=true;
+@@ -7036,7 +7196,7 @@
+     const props=(geojson.features[0]&&geojson.features[0].properties)||{};
+     const name=(item&&item.name)||props.WATERBODY_NAME||props.WATERBODY_ROW_NAME||'Unnamed Lake';
+     resetVerifiedDepthSurface();
+-    selectedLake={name,wbic,geometry:geojson,detail:null,acres:geojsonAcres(geojson),county:null,depthState:null,discoveredBy:item&&item.discoveredBy||'map'};
++    selectedLake={name,wbic,geometry:geojson,detail:null,acres:geojsonAcres(geojson),county:null,depthState:null,discoveredBy:item&&item.discoveredBy||'map',launches:[],launchState:'loading'};
+     showSelectedLakeOnMap(!!fit);
+     updateSelectedLakeUi();
+     updateLakeDiscoveryUi();
+@@ -7053,13 +7213,14 @@
+         updateLakeDiscoveryUi();
+       });
+     }
++    refreshSelectedLakeLaunches(false);
+     if (wbic && window.Android && Android.loadLakeDetail) Android.loadLakeDetail(wbic);
+   }
+ 
+   async function discoverLakeAt(lat,lon) {
+     if (!map || offlineMode || routeDrawMode || addMode || mapMode!=='2d') return;
+     const requestId=++lakeDiscoveryRequestId;
+-    showLakeDiscoveryLoading('Identifying lake…');
++    if (!selectedLake) showLakeDiscoveryLoading('Identifying lake…');
+     try {
+       const where='HYDROTYPE IN (706,707,710)';
+       const url=dnrLakeQueryBase()+'where='+encodeURIComponent(where)+
+@@ -7072,7 +7233,7 @@
+       const json=await resp.json();
+       if (requestId!==lakeDiscoveryRequestId) return;
+       const features=(json&&json.features)||[];
+-      if (!features.length) { if(selectedLake){ updateLakeDiscoveryUi(); setLakeDiscoveryCardVisible(true); } else setLakeDiscoveryCardVisible(false); return; }
