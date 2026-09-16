@@ -1,0 +1,6 @@
+-    $('lakeLibraryRefreshBtn').addEventListener('click', () => { renderLakeLibrary(); refreshLakeLibraryNearby(true); });
++    $('lakeLibraryRefreshBtn').addEventListener('click', () => { renderLakeLibrary(); refreshLakeLibraryNearby(true); syncRecentlyBoatedFromTrackLogs(false); });
++    $('lakeLibrarySyncTracksBtn').addEventListener('click', () => syncRecentlyBoatedFromTrackLogs(true));
+     $('lakeLibraryNearbyRefreshBtn').addEventListener('click', () => refreshLakeLibraryNearby(true));
+     $('lakeLibraryNearbyRadius').addEventListener('change', e => { lakeNearbyRadiusMiles=Number(e.target.value)||25; localStorage.setItem(STORAGE_LAKE_NEARBY_RADIUS,String(lakeNearbyRadiusMiles)); lakeNearby=[]; refreshLakeLibraryNearby(true); });
+ 
