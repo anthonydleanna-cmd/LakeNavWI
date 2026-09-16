@@ -1,0 +1,98 @@
+--- a/app/src/main/assets/index.html
++++ b/app/src/main/assets/index.html
+@@ -1097,7 +1097,7 @@
+ <div id="app">
+   <div id="statusbar">
+     <div>
+-      <div id="brand">LakeNav WI <span class="versionPill">v0.77</span></div>
++      <div id="brand">LakeNav WI <span class="versionPill">v0.78</span></div>
+       <div id="gpsState">Waiting for GPS...</div>
+       <button id="gpsQualityChip" class="gpsQualityChip noFix" type="button" aria-label="GPS quality"><span class="gpsQualityDot"></span><span id="gpsQualityText">NO FIX</span></button>
+     </div>
+@@ -1316,7 +1316,7 @@
+ <div class="sheetBackdrop" id="trackLogSheet">
+   <div class="sheet">
+     <div class="sheetHeader"><h2>Track log</h2><button class="closeBtn" data-close="trackLogSheet">x</button></div>
+-    <p class="muted">Completed tracking sessions are saved here. Tap Show on map to display a track; tap the soft route line on the map for trip details.</p>
++    <p class="muted">Completed tracking sessions are saved here. Use Show / Hide to control each saved track on the map; tap the soft route line for trip details.</p>
+     <div id="trackLogList"></div>
+   </div>
+ </div>
+@@ -2081,11 +2081,34 @@
+       '<div class="btnRow" style="margin-top:9px"><button class="btn small" onclick="window.startReturnTrackById && window.startReturnTrackById(\''+escapeHtml(h.id)+'\')">Navigate back</button></div></div>';
+   }
+ 
+-  function showHistoryTrack(id) {
++  function historyTrackIsShown(h) {
++    if (!h || !trackHistoryEnabled || h.visible===false) return false;
++    return Number(h.endTime||0)>=trackHistoryMinTime();
++  }
++
++  function hideHistoryTrack(id) {
++    const h=trackHistory.find(x=>x.id===id);
++    if (!h) return;
++    h.visible=false;
++    saveTrackHistory();
++    if (map) { try { map.closePopup(); } catch(e) {} }
++    renderTrackHistoryOverlays();
++    renderTrackHistorySettings();
++    renderTrackLog();
++    if (window.Android&&Android.toast) Android.toast('Saved track hidden');
++  }
++
++  function toggleHistoryTrack(id) {
+     const h=trackHistory.find(x=>x.id===id);
+     if (!h || !map || !Array.isArray(h.points) || h.points.length<2) return;
++    if (historyTrackIsShown(h)) { hideHistoryTrack(id); return; }
+     h.visible=true;
+     trackHistoryEnabled=true;
++    // An explicit Show request should not silently fail because the history range excludes this trip.
++    if (Number(h.endTime||0)<trackHistoryMinTime()) {
++      trackHistoryRange='all';
++      localStorage.setItem(STORAGE_TRACK_HISTORY_RANGE,trackHistoryRange);
++    }
+     localStorage.setItem(STORAGE_TRACK_HISTORY_ENABLED,'1');
+     saveTrackHistory();
+     renderTrackHistoryOverlays();
+@@ -2098,10 +2121,12 @@
+     map.fitBounds(bounds,{padding:[45,70],maxZoom:16,animate:true,duration:.45});
+     setTimeout(()=>{
+       const mid=pts[Math.floor(pts.length/2)];
+-      L.popup({maxWidth:280,closeButton:true}).setLatLng(mid).setContent(trackHistoryPopupHtml(h)).openOn(map);
++      L.popup({maxWidth:280,closeButton:true,autoClose:true}).setLatLng(mid).setContent(trackHistoryPopupHtml(h)).openOn(map);
+     },520);
+   }
+ 
++  function showHistoryTrack(id) { toggleHistoryTrack(id); }
++
+   function renderTrackMenu() {
+     const status=$('trackMenuStatus'), detail=$('trackMenuDetail'), action=$('trackActionBtn'), dot=$('trackMenuDot');
+     if (!status || !detail || !action) return;
+@@ -2133,9 +2158,10 @@
+     }
+     holder.innerHTML=[...trackHistory].sort((a,b)=>Number(b.startTime||0)-Number(a.startTime||0)).map(h=>{
+       const dist=formatHistoryDistance(h.distanceM||trackHistoryDistance(h.points||[]));
+-      return '<div class="trackLogItem"><div class="trackLogTop"><span class="trackColorDot" style="background:'+escapeHtml(h.color||'#147aa6')+'"></span><div><strong>'+escapeHtml(historyTripDate(h))+'</strong><small>'+escapeHtml(historyTripTime(h.startTime))+' – '+escapeHtml(historyTripTime(h.endTime))+' • '+escapeHtml(dist)+'</small></div></div><div class="btnRow"><button class="btn small secondary" data-track-log-show="'+escapeHtml(h.id)+'">Show</button><button class="btn small" data-track-log-return="'+escapeHtml(h.id)+'">Navigate back</button></div></div>';
++      const shown=historyTrackIsShown(h);
++      return '<div class="trackLogItem"><div class="trackLogTop"><span class="trackColorDot" style="background:'+escapeHtml(h.color||'#147aa6')+'"></span><div><strong>'+escapeHtml(historyTripDate(h))+'</strong><small>'+escapeHtml(historyTripTime(h.startTime))+' – '+escapeHtml(historyTripTime(h.endTime))+' • '+escapeHtml(dist)+'</small></div></div><div class="btnRow"><button class="btn small secondary" data-track-log-show="'+escapeHtml(h.id)+'">'+(shown?'Hide':'Show')+'</button><button class="btn small" data-track-log-return="'+escapeHtml(h.id)+'">Navigate back</button></div></div>';
+     }).join('');
+-    holder.querySelectorAll('[data-track-log-show]').forEach(btn=>btn.addEventListener('click',()=>showHistoryTrack(btn.dataset.trackLogShow)));
++    holder.querySelectorAll('[data-track-log-show]').forEach(btn=>btn.addEventListener('click',()=>toggleHistoryTrack(btn.dataset.trackLogShow)));
+     holder.querySelectorAll('[data-track-log-return]').forEach(btn=>btn.addEventListener('click',()=>startReturnTrackById(btn.dataset.trackLogReturn)));
+   }
+ 
+@@ -2397,10 +2423,12 @@
+       const pts=trackPolylineLatLngs(h.points);
+       if (pts.length<2) return;
+       const popup=trackHistoryPopupHtml(h);
+-      const visible=L.polyline(pts,{color:h.color||'#147aa6',weight:3,opacity:.28,interactive:true,lineCap:'round',lineJoin:'round'}).addTo(trackHistoryLayerGroup);
++      const visible=L.polyline(pts,{color:h.color||'#147aa6',weight:3,opacity:.28,interactive:true,bubblingMouseEvents:false,lineCap:'round',lineJoin:'round'}).addTo(trackHistoryLayerGroup);
+       visible.bindPopup(popup,{maxWidth:280});
+-      const hit=L.polyline(pts,{color:h.color||'#147aa6',weight:18,opacity:.01,interactive:true,lineCap:'round',lineJoin:'round'}).addTo(trackHistoryLayerGroup);
++      visible.on('click',e=>{ if(e&&e.originalEvent&&L.DomEvent) L.DomEvent.stopPropagation(e.originalEvent); });
++      const hit=L.polyline(pts,{color:h.color||'#147aa6',weight:18,opacity:.01,interactive:true,bubblingMouseEvents:false,lineCap:'round',lineJoin:'round'}).addTo(trackHistoryLayerGroup);
+       hit.bindPopup(popup,{maxWidth:280});
++      hit.on('click',e=>{ if(e&&e.originalEvent&&L.DomEvent) L.DomEvent.stopPropagation(e.originalEvent); });
+     });
+   }
+ 
