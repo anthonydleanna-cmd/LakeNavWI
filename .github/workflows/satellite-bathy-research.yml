@@ -24,7 +24,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install analysis dependencies
-        run: pip install geopandas requests pyogrio shapely pyproj rasterio scikit-learn pandas numpy
+        run: pip install geopandas requests pyogrio shapely pyproj rasterio scikit-learn pandas numpy openpyxl
 
       - name: Run Sentinel-2 validation
         env:
@@ -34,8 +34,13 @@ jobs:
           CPL_VSIL_CURL_ALLOWED_EXTENSIONS: .tif,.TIF
         run: python research/run_validate_fixed.py
 
+      - name: Run optical shallows study
+        run: python research/optical_shallows_eval.py
+
       - name: Upload validation outputs
         uses: actions/upload-artifact@v4
         with:
           name: satellite-bathy-validation
-          path: research_validation
+          path: |
+            research_validation
+            research_optical_shallows
