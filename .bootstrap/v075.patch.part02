@@ -1,0 +1,104 @@
++  }
++
++  async function refreshSelectedLakeFishingInfo(force=false) {
++    if(!selectedLake) return;
++    if(!selectedLake.wbic) { selectedLake.fishingState='unavailable'; selectedLake.fishingInfo=null; updateLakeDiscoveryUi(); renderLakeFishingInfo(); return; }
++    if(!force && selectedLake.fishingState==='ready') { renderLakeFishingInfo(); return; }
++    const requestId=++lakeDiscoveryFishingRequestId;
++    const key=String(selectedLake.wbic)+'|'+String(selectedLake.name||'');
++    selectedLake.fishingState='loading'; selectedLake.fishingInfo=null; updateLakeDiscoveryUi(); renderLakeFishingInfo();
++    const lakeUrl=lakeDnrDetailUrl(selectedLake), regUrl=lakeFishingRegulationsUrl(selectedLake);
++    const lakeReq=fetchDnrHtml(lakeUrl).then(parseDnrFishInfoHtml).catch(()=>({species:[],clarity:''}));
++    const regReq=fetchDnrHtml(regUrl).then(html=>html).catch(()=>null);
++    try {
++      const [fish,regHtml]=await Promise.all([lakeReq,regReq]);
++      if(requestId!==lakeDiscoveryFishingRequestId || !selectedLake || (String(selectedLake.wbic)+'|'+String(selectedLake.name||''))!==key) return;
++      const regulations=regHtml ? parseDnrRegulationsHtml(regHtml,fish.species) : {rows:[],totalRows:0,general:[]};
++      selectedLake.fishingInfo={species:fish.species,clarity:fish.clarity,regulations};
++      selectedLake.fishingState=(fish.species.length||regulations.totalRows)?'ready':'unavailable';
++    } catch(e) {
++      if(requestId!==lakeDiscoveryFishingRequestId||!selectedLake) return;
++      selectedLake.fishingState='unavailable'; selectedLake.fishingInfo=null;
++    }
++    updateLakeDiscoveryUi(); renderLakeFishingInfo();
++  }
++
+   async function refreshSelectedLakeLaunches(force=false) {
+     if (!selectedLake) return;
+     if (!force && selectedLake.launchState==='ready') { renderLakeDiscoveryLaunchList(); return; }
+@@ -7031,6 +7223,7 @@
+   function clearSelectedLakeDiscovery() {
+     lakeDiscoveryRequestId++;
+     lakeDiscoveryLaunchRequestId++;
++    lakeDiscoveryFishingRequestId++;
+     if (selectedLakeLayer && map) { try { map.removeLayer(selectedLakeLayer); } catch(e){} }
+     selectedLakeLayer=null;
+     selectedLake=null;
+@@ -7083,6 +7276,10 @@
+     const launchInfo=selectedLake.launchState==='ready' ? (launches.length?{text:'LAUNCHES • '+launches.length,cls:'good'}:{text:'NO DNR LAUNCH',cls:'mutedBadge'}) : (selectedLake.launchState==='error'?{text:'LAUNCHES • UNAVAILABLE',cls:'warn'}:{text:'LAUNCHES • CHECKING',cls:'mutedBadge'});
+     applyDiscoveryBadge($('lakeDiscoveryLaunchBadge'),launchInfo);
+     applyDiscoveryBadge($('lakeDiscoverySheetLaunchBadge'),launchInfo);
++    const fishCount=selectedLake.fishingInfo&&Array.isArray(selectedLake.fishingInfo.species)?selectedLake.fishingInfo.species.length:0;
++    const fishInfo=selectedLake.fishingState==='ready'?{text:'FISH • '+(fishCount||'DNR'),cls:'good'}:(selectedLake.fishingState==='unavailable'?{text:'FISH • NO DATA',cls:'mutedBadge'}:{text:'FISH • CHECKING',cls:'mutedBadge'});
++    applyDiscoveryBadge($('lakeDiscoveryFishBadge'),fishInfo);
++    applyDiscoveryBadge($('lakeDiscoverySheetFishBadge'),fishInfo);
+     if ($('lakeDiscoveryLaunchBtn')) $('lakeDiscoveryLaunchBtn').textContent=launches.length ? (launches.length+' LAUNCH'+(launches.length===1?'':'ES')) : 'LAUNCHES';
+     if ($('lakeDiscoverySourceBadge')) $('lakeDiscoverySourceBadge').textContent=selectedLake.wbic?'DNR • WBIC MATCH':'DNR • HYDRO ONLY';
+     if ($('lakeDiscoverySheetSourceBadge')) $('lakeDiscoverySheetSourceBadge').textContent=selectedLake.wbic?'DNR • WBIC MATCH':'DNR • HYDRO ONLY';
+@@ -7095,7 +7292,7 @@
+     const hasWbic=!!selectedLake.wbic;
+     if ($('lakeDiscoveryExploreBtn')) $('lakeDiscoveryExploreBtn').disabled=false;
+     if ($('lakeDiscoveryLaunchBtn')) $('lakeDiscoveryLaunchBtn').disabled=false;
+-    ['lakeDiscoverySheetBathyBtn','lakeDiscoverySheetOfflineBtn','lakeDiscoverySheetDnrBtn'].forEach(id=>{ const el=$(id); if(el) el.disabled=!hasWbic; });
++    ['lakeDiscoverySheetBathyBtn','lakeDiscoverySheetOfflineBtn','lakeDiscoverySheetDnrBtn','lakeFishingAllRegsBtn','lakeFishingDnrLakeBtn','lakeFishingConsumptionBtn'].forEach(id=>{ const el=$(id); if(el) el.disabled=!hasWbic; });
+     if ($('lakeDiscoverySheetStatus')) {
+       $('lakeDiscoverySheetStatus').textContent=hasWbic ? 'Lake identity and shoreline are matched to Wisconsin DNR WBIC '+wbic+'. Depth is shown only when LakeNav has a verified vector source or an official DNR reference.' : 'This waterbody is present in Wisconsin DNR hydrography but does not expose a WBIC here, so WBIC-linked details and offline packages are unavailable.';
+     }
+@@ -7108,6 +7305,7 @@
+     if ($('lakeDiscoveryMeta')) $('lakeDiscoveryMeta').textContent='Wisconsin DNR hydrography';
+     if ($('lakeDiscoveryDepthBadge')) { $('lakeDiscoveryDepthBadge').textContent='DEPTH • CHECKING'; $('lakeDiscoveryDepthBadge').className='lakeDiscoveryBadge mutedBadge'; }
+     if ($('lakeDiscoveryLaunchBadge')) { $('lakeDiscoveryLaunchBadge').textContent='LAUNCHES • CHECKING'; $('lakeDiscoveryLaunchBadge').className='lakeDiscoveryBadge mutedBadge'; }
++    if ($('lakeDiscoveryFishBadge')) { $('lakeDiscoveryFishBadge').textContent='FISH • CHECKING'; $('lakeDiscoveryFishBadge').className='lakeDiscoveryBadge mutedBadge'; }
+     if ($('lakeDiscoverySourceBadge')) $('lakeDiscoverySourceBadge').textContent='DNR • LOOKUP';
+     if ($('lakeDiscoveryExploreBtn')) $('lakeDiscoveryExploreBtn').disabled=true;
+     if ($('lakeDiscoveryLaunchBtn')) $('lakeDiscoveryLaunchBtn').disabled=true;
+@@ -7194,7 +7392,7 @@
+     const props=(geojson.features[0]&&geojson.features[0].properties)||{};
+     const name=(item&&item.name)||props.WATERBODY_NAME||props.WATERBODY_ROW_NAME||'Unnamed Lake';
+     resetVerifiedDepthSurface();
+-    selectedLake={name,wbic,geometry:geojson,detail:null,acres:geojsonAcres(geojson),county:null,depthState:null,discoveredBy:item&&item.discoveredBy||'map',launches:[],launchState:'loading'};
++    selectedLake={name,wbic,geometry:geojson,detail:null,acres:geojsonAcres(geojson),county:null,depthState:null,discoveredBy:item&&item.discoveredBy||'map',launches:[],launchState:'loading',fishingState:'loading',fishingInfo:null};
+     showSelectedLakeOnMap(!!fit);
+     updateSelectedLakeUi();
+     updateLakeDiscoveryUi();
+@@ -7212,6 +7410,7 @@
+       });
+     }
+     refreshSelectedLakeLaunches(false);
++    refreshSelectedLakeFishingInfo(false);
+     if (wbic && window.Android && Android.loadLakeDetail) Android.loadLakeDetail(wbic);
+   }
+ 
+@@ -7252,8 +7451,10 @@
+     if (!selectedLake) return;
+     updateLakeDiscoveryUi();
+     renderLakeDiscoveryLaunchList();
++    renderLakeFishingInfo();
+     openSheet('lakeDiscoverySheet');
+     if (selectedLake.launchState!=='ready') refreshSelectedLakeLaunches(false);
++    if (selectedLake.fishingState!=='ready') refreshSelectedLakeFishingInfo(false);
+   }
+ 
+   async function searchLakes() {
+@@ -8236,6 +8437,11 @@
+     $('lakeDiscoveryExploreBtn').addEventListener('click', openLakeDiscoverySheet);
+     $('lakeDiscoveryLaunchBtn').addEventListener('click', openLakeDiscoverySheet);
+     $('lakeDiscoveryRefreshLaunchesBtn').addEventListener('click', () => refreshSelectedLakeLaunches(true));
++    $('lakeFishingRefreshBtn').addEventListener('click', () => refreshSelectedLakeFishingInfo(true));
++    $('lakeFishingAllRegsBtn').addEventListener('click', () => { const url=lakeFishingRegulationsUrl(selectedLake); if(url) openExternal(url); });
++    $('lakeFishingDnrLakeBtn').addEventListener('click', () => { const url=lakeDnrDetailUrl(selectedLake); if(url) openExternal(url); });
++    $('lakeFishingConsumptionBtn').addEventListener('click', () => openExternal('https://apps.dnr.wi.gov/fishconsumptionadvisoryquery/'));
++    $('lakeFishingStateRegsBtn').addEventListener('click', () => openExternal('https://dnr.wisconsin.gov/topic/fishing/regulations'));
+     $('lakeDiscoverySheetBathyBtn').addEventListener('click', openSelectedBathymetry);
+     $('lakeDiscoverySheetOfflineBtn').addEventListener('click', saveSelectedLakeOffline);
+     $('lakeDiscoverySheetDnrBtn').addEventListener('click', () => { if(selectedLake&&selectedLake.wbic) openExternal('https://apps.dnr.wi.gov/lakes/lakepages/LakeDetail.aspx?wbic='+encodeURIComponent(selectedLake.wbic)); });
