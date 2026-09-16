@@ -1,0 +1,125 @@
+--- a/app/src/main/assets/index.html
++++ b/app/src/main/assets/index.html
+@@ -208,6 +208,27 @@
+ .lakeDiscoveryLaunchActions { display:flex; gap:5px; }
+ .lakeDiscoveryLaunchActions button { min-height:31px; padding:0 8px; border-radius:10px; font-size:8px; font-weight:900; }
+ .lakeDiscoveryLaunchMarker { filter:drop-shadow(0 2px 3px rgba(0,0,0,.28)); }
++.lakeLaunchPopup { min-width:190px; max-width:245px; color:#173b4b; }
++.lakeLaunchPopup strong { display:block; font-size:12px; line-height:1.2; }
++.lakeLaunchPopupMeta { margin:4px 0 8px; color:#647b86; font-size:9px; line-height:1.35; }
++.lakeLaunchPopup .btn { width:100%; min-height:34px; }
++.lakeFishingCard { margin-top:12px; padding:12px; border-radius:17px; background:#f3f8fa; border:1px solid #dfebf0; }
++.lakeFishingHead { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
++.lakeFishingHead h3 { margin:0; font-size:14px; letter-spacing:-.015em; }
++.lakeFishingHead .muted { margin-top:2px; font-size:9px; }
++.lakeFishChips { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
++.lakeFishChip { display:inline-flex; align-items:center; gap:4px; padding:5px 8px; border-radius:999px; background:#e4f3f7; border:1px solid rgba(23,112,143,.11); color:#18586f; font-size:9px; font-weight:850; }
++.lakeFishChip small { opacity:.67; font-size:7px; font-weight:850; text-transform:uppercase; }
++.lakeFishEmpty { margin-top:9px; color:#70858e; font-size:9px; line-height:1.4; }
++.lakeRegList { margin-top:10px; border-top:1px solid rgba(80,126,145,.13); }
++.lakeRegRow { padding:9px 0; border-bottom:1px solid rgba(80,126,145,.13); }
++.lakeRegFish { font-size:10px; font-weight:950; color:#173e50; }
++.lakeRegSeason { margin-top:2px; color:#0c789f; font-size:8px; font-weight:850; }
++.lakeRegText { margin-top:3px; color:#607781; font-size:9px; line-height:1.4; }
++.lakeFishingActions { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:10px; }
++.lakeFishingActions .btn { min-height:36px; }
++.lakeFishingDisclaimer { margin-top:8px; color:#788b93; font-size:8px; line-height:1.35; }
++
+ 
+ 
+ .offlineBadge { display: inline-block; border-radius: 10px; padding: 2px 7px; background: #e8f4eb; color: #165c2c; font-size: 10px; font-weight: 700; margin-left: 5px; }
+@@ -854,6 +875,15 @@
+ html.darkMode body .lakeDiscoveryLaunchRow { border-color:rgba(150,196,214,.13); }
+ html.darkMode body .lakeDiscoveryLaunchName { color:#e6f5f8; }
+ html.darkMode body .lakeDiscoveryLaunchMeta { color:#9fb4bd; }
++html.darkMode body .lakeFishingCard { background:#102f3c; border-color:#244957; }
++html.darkMode body .lakeFishChip { background:#173c49; border-color:#2a5565; color:#d1f0f6; }
++html.darkMode body .lakeFishEmpty, html.darkMode body .lakeFishingDisclaimer { color:#9db2bb; }
++html.darkMode body .lakeRegList, html.darkMode body .lakeRegRow { border-color:rgba(150,196,214,.13); }
++html.darkMode body .lakeRegFish { color:#e5f5f8; }
++html.darkMode body .lakeRegSeason { color:#73d6f5; }
++html.darkMode body .lakeRegText { color:#a8bec7; }
++html.darkMode body .lakeLaunchPopup { color:#173b4b; }
++
+ 
+ 
+ html.darkMode body #compassHud { background:rgba(10,34,47,.96); color:#ecf8fb; }
+@@ -1025,7 +1055,7 @@
+ <div id="app">
+   <div id="statusbar">
+     <div>
+-      <div id="brand">LakeNav WI <span class="versionPill">v0.74</span></div>
++      <div id="brand">LakeNav WI <span class="versionPill">v0.75</span></div>
+       <div id="gpsState">Waiting for GPS...</div>
+       <button id="gpsQualityChip" class="gpsQualityChip noFix" type="button" aria-label="GPS quality"><span class="gpsQualityDot"></span><span id="gpsQualityText">NO FIX</span></button>
+     </div>
+@@ -1144,7 +1174,7 @@
+         <div class="lakeDiscoveryCopy"><span class="lakeDiscoveryEyebrow">Wisconsin lake</span><strong id="lakeDiscoveryName">--</strong><div id="lakeDiscoveryMeta">Tap a lake to identify it.</div></div>
+         <button id="lakeDiscoveryClose" type="button" aria-label="Close lake discovery">×</button>
+       </div>
+-      <div class="lakeDiscoveryBadges"><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoveryDepthBadge">DEPTH • CHECKING</span><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoveryLaunchBadge">LAUNCHES • CHECKING</span><span class="lakeDiscoveryBadge" id="lakeDiscoverySourceBadge">DNR HYDRO</span></div>
++      <div class="lakeDiscoveryBadges"><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoveryDepthBadge">DEPTH • CHECKING</span><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoveryLaunchBadge">LAUNCHES • CHECKING</span><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoveryFishBadge">FISH • CHECKING</span><span class="lakeDiscoveryBadge" id="lakeDiscoverySourceBadge">DNR HYDRO</span></div>
+       <div id="lakeDiscoveryLoading">Loading Wisconsin DNR lake information…</div>
+       <div class="lakeDiscoveryActions"><button id="lakeDiscoveryExploreBtn" type="button">EXPLORE LAKE</button><button id="lakeDiscoveryLaunchBtn" type="button">LAUNCH</button></div>
+     </div>
+@@ -1334,7 +1364,7 @@
+       <span class="lakeDiscoveryEyebrow">Wisconsin DNR waterbody</span>
+       <h3 id="lakeDiscoverySheetTitle">Selected lake</h3>
+       <div class="lakeDiscoverySheetMeta" id="lakeDiscoverySheetMeta">--</div>
+-      <div class="lakeDiscoveryDataRow"><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoverySheetDepthBadge">DEPTH • CHECKING</span><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoverySheetLaunchBadge">LAUNCHES • CHECKING</span><span class="lakeDiscoveryBadge" id="lakeDiscoverySheetSourceBadge">DNR HYDRO</span></div>
++      <div class="lakeDiscoveryDataRow"><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoverySheetDepthBadge">DEPTH • CHECKING</span><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoverySheetLaunchBadge">LAUNCHES • CHECKING</span><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoverySheetFishBadge">FISH • CHECKING</span><span class="lakeDiscoveryBadge" id="lakeDiscoverySheetSourceBadge">DNR HYDRO</span></div>
+     </div>
+     <div class="lakeDiscoveryGrid">
+       <div class="lakeDiscoveryStat"><span>County</span><strong id="lakeDiscoveryCounty">--</strong></div>
+@@ -1346,6 +1376,19 @@
+       <div class="lakeDiscoveryLaunchHead"><div><h3>Public boat access</h3><div class="muted">Wisconsin DNR access sites matched to or near this lake.</div></div><button class="btn small secondary" id="lakeDiscoveryRefreshLaunchesBtn">Refresh</button></div>
+       <div id="lakeDiscoveryLaunchList"><div class="muted">Checking Wisconsin DNR public boat access…</div></div>
+     </div>
++    <div class="lakeFishingCard">
++      <div class="lakeFishingHead"><div><h3>Fishing & regulations</h3><div class="muted" id="lakeFishingSourceLine">Wisconsin DNR lake and fisheries information.</div></div><button class="btn small secondary" id="lakeFishingRefreshBtn">Refresh</button></div>
++      <div id="lakeFishSpecies"><div class="lakeFishEmpty">Checking DNR-reported fish species…</div></div>
++      <div id="lakeFishingRegStatus" class="lakeFishEmpty">Checking lake-specific fishing regulations…</div>
++      <div id="lakeFishingRegList" class="lakeRegList"></div>
++      <div class="lakeFishingActions">
++        <button class="btn small" id="lakeFishingAllRegsBtn">ALL FISHING REGS</button>
++        <button class="btn small secondary" id="lakeFishingDnrLakeBtn">DNR LAKE PAGE</button>
++        <button class="btn small secondary" id="lakeFishingConsumptionBtn">FISH CONSUMPTION</button>
++        <button class="btn small secondary" id="lakeFishingStateRegsBtn">STATEWIDE REGS</button>
++      </div>
++      <div class="lakeFishingDisclaimer">Regulations are a live DNR reference and can change. Always verify the current DNR rule page before fishing; special trout, border-water and tribal rules may be separate.</div>
++    </div>
+     <div class="btnRow" style="margin-top:12px">
+       <button class="btn secondary" id="lakeDiscoverySheetBathyBtn">Bathymetry</button>
+       <button class="btn secondary" id="lakeDiscoverySheetOfflineBtn">Save offline</button>
+@@ -1804,6 +1847,9 @@
+   let lakeDiscoveryRequestId = 0;
+   let lakeDiscoveryLaunchRequestId = 0;
+   let lakeDiscoveryLaunchMarkers = [];
++  let lakeDiscoveryFishingRequestId = 0;
++  let nativeDnrRequestSeq = 0;
++  const nativeDnrRequests = new Map();
+   let offlineImageLayer = null;
+   let offlineFallbackPackage = null;
+   let lakeSearchResults = [];
+@@ -6872,10 +6918,18 @@
+       const m=L.circleMarker([l.lat,l.lon],{
+         radius:6,weight:2,color:l.matchQuality==='matched'?'#14885c':'#5b6fd6',
+         fillColor:'#ffffff',fillOpacity:1,bubblingMouseEvents:false,className:'lakeDiscoveryLaunchMarker'
+-      }).addTo(map).bindTooltip(l.name,{direction:'top',offset:[0,-4]});
++      }).addTo(map);
++      const popup=document.createElement('div'); popup.className='lakeLaunchPopup';
++      const title=document.createElement('strong'); title.textContent=l.name; popup.appendChild(title);
++      const meta=document.createElement('div'); meta.className='lakeLaunchPopupMeta';
++      const type=l.type==='RAMP'?'Boat ramp':(l.type&&l.type!=='UNKNOWN'?l.type:'Public access');
++      meta.textContent=[type,launchDistanceLabel(l),l.owner||''].filter(Boolean).join(' • '); popup.appendChild(meta);
++      const nav=document.createElement('button'); nav.type='button'; nav.className='btn small'; nav.textContent='NAVIGATE';
++      nav.addEventListener('click',evt=>{ evt.stopPropagation(); openLaunchNavigation(l); }); popup.appendChild(nav);
++      m.bindPopup(popup,{closeButton:true,autoPan:true,offset:[0,-4]});
+       m.on('click',evt=>{
+         if (evt&&evt.originalEvent) L.DomEvent.stopPropagation(evt.originalEvent);
+-        m.openTooltip();
++        m.openPopup();
+       });
+       lakeDiscoveryLaunchMarkers.push(m);
+     });
+@@ -6917,7 +6971,7 @@
