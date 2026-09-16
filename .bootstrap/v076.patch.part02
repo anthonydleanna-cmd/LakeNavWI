@@ -1,0 +1,111 @@
++      const resp=await fetch(url); if(!resp.ok) throw new Error('DNR HTTP '+resp.status);
++      const json=await resp.json(); if(requestId!==lakeNearbyRequestId) return;
++      const seen=new Set(), rows=[];
++      (json.features||[]).forEach(f=>{
++        const p=f.properties||{}, center=geojsonCenter({type:'FeatureCollection',features:[f]}); if(!center) return;
++        const d=distanceMeters(lat,lon,center.lat,center.lon); if(d*M_TO_MI>r+.25) return;
++        const wbic=p.WATERBODY_WBIC?String(p.WATERBODY_WBIC):'';
++        const name=p.WATERBODY_NAME||p.WATERBODY_ROW_NAME||'Unnamed Lake';
++        const key=wbic?'w:'+wbic:'g:'+center.lat.toFixed(4)+','+center.lon.toFixed(4); if(seen.has(key)) return; seen.add(key);
++        rows.push({name,wbic,center,distanceM:d,acres:featureAreaSqMeters(f)/4046.8564224,feature:f});
++      });
++      rows.sort((a,b)=>a.distanceM-b.distanceM || String(a.name).localeCompare(String(b.name)));
++      lakeNearby=rows.slice(0,40);
++      if(status) status.textContent=lakeNearby.length+' lakes found within '+r+' miles • nearest first';
++    } catch(e) {
++      lakeNearby=[]; if(status) status.textContent='Nearby lake search unavailable right now.';
++    }
++    renderLakeLibrary();
++  }
++
++  function openLakeLibrarySheet() {
++    renderLakeLibrary();
++    openSheet('lakeLibrarySheet');
++    if(currentLoc && !lakeNearby.length) refreshLakeLibraryNearby(false);
++  }
++
+   function clearSelectedLakeDiscovery() {
+     lakeDiscoveryRequestId++;
+     lakeDiscoveryLaunchRequestId++;
+@@ -7281,6 +7532,7 @@
+     applyDiscoveryBadge($('lakeDiscoveryFishBadge'),fishInfo);
+     applyDiscoveryBadge($('lakeDiscoverySheetFishBadge'),fishInfo);
+     if ($('lakeDiscoveryLaunchBtn')) $('lakeDiscoveryLaunchBtn').textContent=launches.length ? (launches.length+' LAUNCH'+(launches.length===1?'':'ES')) : 'LAUNCHES';
++    updateLakeFavoriteButtons();
+     if ($('lakeDiscoverySourceBadge')) $('lakeDiscoverySourceBadge').textContent=selectedLake.wbic?'DNR • WBIC MATCH':'DNR • HYDRO ONLY';
+     if ($('lakeDiscoverySheetSourceBadge')) $('lakeDiscoverySheetSourceBadge').textContent=selectedLake.wbic?'DNR • WBIC MATCH':'DNR • HYDRO ONLY';
+     if ($('lakeDiscoverySheetTitle')) $('lakeDiscoverySheetTitle').textContent=selectedLake.name||'Unnamed Lake';
+@@ -7393,6 +7645,8 @@
+     const name=(item&&item.name)||props.WATERBODY_NAME||props.WATERBODY_ROW_NAME||'Unnamed Lake';
+     resetVerifiedDepthSurface();
+     selectedLake={name,wbic,geometry:geojson,detail:null,acres:geojsonAcres(geojson),county:null,depthState:null,discoveredBy:item&&item.discoveredBy||'map',launches:[],launchState:'loading',fishingState:'loading',fishingInfo:null};
++    rememberLakeRecent(selectedLake);
++    syncSelectedLakeLibraryMetadata();
+     showSelectedLakeOnMap(!!fit);
+     updateSelectedLakeUi();
+     updateLakeDiscoveryUi();
+@@ -7407,6 +7661,7 @@
+         selectedLake.county=county;
+         updateSelectedLakeUi();
+         updateLakeDiscoveryUi();
++        syncSelectedLakeLibraryMetadata();
+       });
+     }
+     refreshSelectedLakeLaunches(false);
+@@ -7562,6 +7817,7 @@
+     selectedLake.detail = detail;
+     updateSelectedLakeUi();
+     updateLakeDiscoveryUi();
++    syncSelectedLakeLibraryMetadata();
+     if (depthShadeEnabled) scheduleDepthShadeRefresh();
+   };
+ 
+@@ -7674,8 +7930,11 @@
+     holder.querySelectorAll('[data-offline-open]').forEach(btn => btn.addEventListener('click', () => openOfflineLake(btn.dataset.offlineOpen)));
+     holder.querySelectorAll('[data-offline-bathy]').forEach(btn => btn.addEventListener('click', () => openBathymetryForWbic(btn.dataset.offlineBathy)));
+     holder.querySelectorAll('[data-offline-del]').forEach(btn => btn.addEventListener('click', () => deleteOfflineLake(btn.dataset.offlineDel)));
++    syncLakeLibraryOfflineIfOpen();
+   }
+ 
++  function syncLakeLibraryOfflineIfOpen() { if($('lakeLibrarySheet')&&$('lakeLibrarySheet').classList.contains('open')) renderLakeLibraryOffline(); }
++
+   function openOfflineLake(wbic) {
+     if (!(window.Android && Android.readOfflineLake)) return;
+     try {
+@@ -7683,7 +7942,9 @@
+       if (!text) throw new Error('Offline package not found.');
+       const pkg = JSON.parse(text);
+       resetVerifiedDepthSurface();
+-      selectedLake = { name: pkg.name || 'Saved lake', wbic: String(pkg.wbic), geometry: pkg.geometry, detail: pkg.detail || null };
++      selectedLake = { name: pkg.name || 'Saved lake', wbic: String(pkg.wbic), geometry: pkg.geometry, detail: pkg.detail || null, acres: geojsonAcres(pkg.geometry), county:null, depthState:null, launches:[], launchState:'idle', fishingState:'idle', fishingInfo:null, discoveredBy:'offline' };
++      rememberLakeRecent(selectedLake);
++      syncSelectedLakeLibraryMetadata();
+       offlineFallbackPackage = pkg;
+       setOfflineMode(true);
+       if (map) {
+@@ -7711,6 +7972,7 @@
+     if (!confirm('Delete this lake package and its downloaded bathymetry from the phone?')) return;
+     if (window.Android && Android.deleteOfflineLake) Android.deleteOfflineLake(wbic);
+     renderOfflineLakeList();
++    syncLakeLibraryOfflineIfOpen();
+   }
+ 
+   window.onOfflineMapReady = function (result) {
+@@ -8432,9 +8694,16 @@
+       }
+     });
+     $('markBtn').addEventListener('click', addCurrentWaypoint);
+-    $('searchBtn').addEventListener('click', () => { renderOfflineLakeList(); openSheet('searchSheet'); });
++    $('searchBtn').addEventListener('click', openLakeLibrarySheet);
++    $('lakeLibrarySearchBtn').addEventListener('click', () => { closeSheets(); renderOfflineLakeList(); openSheet('searchSheet'); });
++    $('lakeLibraryRefreshBtn').addEventListener('click', () => { renderLakeLibrary(); refreshLakeLibraryNearby(true); });
++    $('lakeLibraryNearbyRefreshBtn').addEventListener('click', () => refreshLakeLibraryNearby(true));
++    $('lakeLibraryNearbyRadius').addEventListener('change', e => { lakeNearbyRadiusMiles=Number(e.target.value)||25; localStorage.setItem(STORAGE_LAKE_NEARBY_RADIUS,String(lakeNearbyRadiusMiles)); lakeNearby=[]; refreshLakeLibraryNearby(true); });
++
+     $('lakeDiscoveryClose').addEventListener('click', () => setLakeDiscoveryCardVisible(false));
+     $('lakeDiscoveryExploreBtn').addEventListener('click', openLakeDiscoverySheet);
++    $('lakeDiscoveryFavoriteBtn').addEventListener('click', toggleSelectedLakeFavorite);
++    $('lakeDiscoverySheetFavoriteBtn').addEventListener('click', toggleSelectedLakeFavorite);
+     $('lakeDiscoveryLaunchBtn').addEventListener('click', openLakeDiscoverySheet);
+     $('lakeDiscoveryRefreshLaunchesBtn').addEventListener('click', () => refreshSelectedLakeLaunches(true));
+     $('lakeFishingRefreshBtn').addEventListener('click', () => refreshSelectedLakeFishingInfo(true));
