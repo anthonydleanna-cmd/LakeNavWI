@@ -32,7 +32,7 @@ jobs:
           GDAL_HTTP_MULTIPLEX: YES
           GDAL_DISABLE_READDIR_ON_OPEN: EMPTY_DIR
           CPL_VSIL_CURL_ALLOWED_EXTENSIONS: .tif,.TIF
-        run: python research/satellite_bathy_validate.py
+        run: python research/run_validate_fixed.py
 
       - name: Upload validation outputs
         uses: actions/upload-artifact@v4
