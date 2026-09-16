@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  discovery:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - name: Check out LakeNav research branch
@@ -24,15 +24,18 @@ jobs:
           python-version: '3.12'
 
       - name: Install analysis dependencies
-        run: pip install geopandas requests pyogrio shapely pyproj
+        run: pip install geopandas requests pyogrio shapely pyproj rasterio scikit-learn pandas numpy
 
-      - name: Run discovery
+      - name: Run Sentinel-2 validation
         env:
           NTL_REFERENCE_ROOT: ${{ github.workspace }}/ntl-reference
-        run: python research/satellite_bathy_discovery.py
+          GDAL_HTTP_MULTIPLEX: YES
+          GDAL_DISABLE_READDIR_ON_OPEN: EMPTY_DIR
+          CPL_VSIL_CURL_ALLOWED_EXTENSIONS: .tif,.TIF
+        run: python research/satellite_bathy_validate.py
 
-      - name: Upload discovery outputs
+      - name: Upload validation outputs
         uses: actions/upload-artifact@v4
         with:
-          name: satellite-bathy-discovery
-          path: research_output
+          name: satellite-bathy-validation
+          path: research_validation
