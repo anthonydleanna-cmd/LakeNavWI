@@ -1,0 +1,177 @@
+--- a/app/src/main/assets/index.html
++++ b/app/src/main/assets/index.html
+@@ -956,7 +956,7 @@
+ <div id="app">
+   <div id="statusbar">
+     <div>
+-      <div id="brand">LakeNav WI <span class="versionPill">v0.69</span></div>
++      <div id="brand">LakeNav WI <span class="versionPill">v0.70</span></div>
+       <div id="gpsState">Waiting for GPS...</div>
+       <button id="gpsQualityChip" class="gpsQualityChip noFix" type="button" aria-label="GPS quality"><span class="gpsQualityDot"></span><span id="gpsQualityText">NO FIX</span></button>
+     </div>
+@@ -1464,6 +1464,57 @@
+     { minZoom: 0, name: 'General', url: 'https://encdirect.noaa.gov/arcgis/rest/services/encdirect/enc_general/MapServer/117/query' }
+   ];
+ 
++
++  // v0.70 Wisconsin DNR historical bathymetry pilot.
++  // Contours below are hand-vectorized from public DNR survey sheets, then
++  // approximately registered to the selected lake's modern DNR shoreline bounds.
++  // They are intentionally kept separate from NOAA verified ENC data.
++  const DNR_SURVEY_VECTOR_PACK = {
++    '1831600': {
++      name: 'Ace-In-The-Hole Lake', year: 1940, maxDepthFt: 48,
++      sourceUrl: 'https://apps.dnr.wi.gov/doclink/lakes_maps/1831600a.pdf',
++      contours: [
++        {depthFt:5,ring:[[.40,.03],[.51,.04],[.62,.09],[.72,.18],[.79,.29],[.82,.42],[.80,.53],[.72,.61],[.64,.62],[.59,.56],[.57,.45],[.55,.31],[.49,.17],[.43,.09]]},
++        {depthFt:10,ring:[[.43,.07],[.52,.08],[.61,.13],[.69,.21],[.75,.31],[.77,.42],[.74,.50],[.68,.55],[.63,.54],[.60,.47],[.59,.35],[.55,.23],[.49,.13]]},
++        {depthFt:15,ring:[[.47,.13],[.55,.13],[.62,.17],[.68,.24],[.71,.33],[.71,.41],[.67,.47],[.63,.46],[.61,.39],[.60,.30],[.56,.21],[.51,.16]]},
++        {depthFt:20,ring:[[.51,.19],[.57,.19],[.62,.22],[.65,.28],[.66,.35],[.64,.40],[.61,.38],[.59,.32],[.58,.26],[.55,.21]]},
++        {depthFt:5,ring:[[.05,.59],[.18,.55],[.33,.56],[.47,.61],[.62,.62],[.74,.65],[.82,.71],[.85,.80],[.82,.89],[.73,.95],[.58,.98],[.41,.97],[.26,.94],[.14,.88],[.07,.80]]},
++        {depthFt:10,ring:[[.09,.63],[.21,.59],[.34,.60],[.48,.64],[.62,.65],[.73,.68],[.79,.73],[.80,.81],[.76,.88],[.66,.92],[.53,.94],[.39,.92],[.26,.89],[.17,.84],[.12,.77]]},
++        {depthFt:15,ring:[[.14,.67],[.24,.63],[.36,.64],[.49,.67],[.61,.68],[.70,.71],[.75,.76],[.74,.82],[.69,.87],[.59,.90],[.47,.90],[.35,.88],[.25,.84],[.19,.79]]},
++        {depthFt:20,ring:[[.20,.70],[.29,.67],[.39,.67],[.50,.70],[.60,.71],[.67,.74],[.70,.78],[.68,.83],[.62,.86],[.53,.87],[.43,.86],[.34,.83],[.26,.80],[.22,.75]]},
++        {depthFt:25,ring:[[.25,.72],[.33,.70],[.42,.70],[.51,.72],[.59,.73],[.64,.76],[.65,.80],[.61,.83],[.54,.84],[.45,.84],[.37,.82],[.30,.79],[.27,.76]]},
++        {depthFt:30,ring:[[.30,.74],[.37,.72],[.44,.72],[.51,.74],[.57,.75],[.61,.78],[.59,.81],[.53,.82],[.46,.82],[.39,.80],[.34,.78]]},
++        {depthFt:35,ring:[[.34,.75],[.40,.74],[.46,.74],[.52,.75],[.56,.77],[.56,.79],[.51,.81],[.45,.80],[.39,.79],[.36,.77]]},
++        {depthFt:40,ring:[[.38,.76],[.43,.75],[.48,.76],[.52,.77],[.52,.79],[.48,.80],[.43,.80],[.40,.78]]},
++        {depthFt:45,ring:[[.41,.77],[.45,.76],[.49,.77],[.50,.78],[.47,.79],[.43,.79]]}
++      ],
++      labels:[{depthFt:22,x:.56,y:.27},{depthFt:10,x:.74,y:.38},{depthFt:20,x:.61,y:.34},{depthFt:10,x:.15,y:.77},{depthFt:20,x:.23,y:.79},{depthFt:30,x:.31,y:.79},{depthFt:40,x:.39,y:.78},{depthFt:48,x:.46,y:.785}]
++    },
++    '703000': {
++      name: 'North Lake', year: 1966, maxDepthFt: 43,
++      sourceUrl: 'https://apps.dnr.wi.gov/doclink/lakes_maps/0702100.pdf',
++      contours: [
++        {depthFt:10,ring:[[.06,.48],[.10,.25],[.22,.14],[.42,.10],[.66,.12],[.84,.21],[.94,.38],[.93,.58],[.84,.73],[.67,.82],[.45,.84],[.25,.78],[.12,.66]]},
++        {depthFt:20,ring:[[.14,.46],[.18,.29],[.30,.20],[.48,.17],[.67,.19],[.81,.27],[.88,.40],[.86,.57],[.77,.67],[.62,.73],[.43,.73],[.28,.68],[.18,.59]]},
++        {depthFt:30,ring:[[.23,.45],[.27,.32],[.39,.25],[.55,.24],[.69,.27],[.79,.34],[.81,.46],[.76,.57],[.65,.63],[.51,.64],[.38,.60],[.29,.54]]},
++        {depthFt:40,ring:[[.34,.44],[.39,.34],[.48,.30],[.57,.31],[.64,.36],[.66,.45],[.62,.52],[.54,.56],[.45,.54],[.38,.50]]}
++      ],
++      labels:[{depthFt:10,x:.83,y:.31},{depthFt:20,x:.77,y:.40},{depthFt:30,x:.70,y:.48},{depthFt:40,x:.53,y:.43},{depthFt:43,x:.49,y:.46}]
++    },
++    '702600': {
++      name: 'Middle Lake', year: 1966, maxDepthFt: 54,
++      sourceUrl: 'https://apps.dnr.wi.gov/doclink/lakes_maps/0702100.pdf',
++      contours: [
++        {depthFt:10,ring:[[.18,.06],[.34,.04],[.50,.09],[.64,.18],[.75,.29],[.86,.41],[.91,.57],[.88,.72],[.77,.86],[.61,.94],[.43,.92],[.29,.83],[.20,.68],[.14,.50],[.13,.30]]},
++        {depthFt:20,ring:[[.23,.14],[.36,.12],[.49,.16],[.61,.24],[.70,.34],[.78,.45],[.81,.58],[.77,.70],[.68,.80],[.55,.86],[.42,.83],[.32,.75],[.25,.63],[.20,.48],[.19,.30]]},
++        {depthFt:30,ring:[[.29,.23],[.39,.20],[.49,.23],[.58,.29],[.65,.38],[.70,.48],[.70,.59],[.66,.69],[.58,.76],[.48,.79],[.39,.74],[.33,.66],[.29,.55],[.26,.42]]},
++        {depthFt:40,ring:[[.35,.32],[.43,.29],[.50,.31],[.57,.36],[.61,.43],[.63,.52],[.61,.61],[.56,.68],[.49,.72],[.42,.68],[.37,.61],[.34,.52],[.33,.42]]},
++        {depthFt:50,ring:[[.41,.41],[.47,.38],[.52,.40],[.56,.45],[.57,.52],[.55,.58],[.51,.62],[.46,.61],[.42,.56],[.40,.49]]}
++      ],
++      labels:[{depthFt:10,x:.76,y:.37},{depthFt:20,x:.72,y:.47},{depthFt:30,x:.65,y:.54},{depthFt:40,x:.57,y:.61},{depthFt:50,x:.48,y:.57},{depthFt:54,x:.49,y:.52}]
++    }
++  };
++
+   let map = null;
+   let map3d = null;
+   let map3dLoaded = false;
+@@ -5236,20 +5287,62 @@
+   }
+ 
+   function setMarineDepthState(state,label) {
++    const isDnr=state==='reference'||state==='survey';
+     const wrap=$('mapWrap');
+     if (wrap) {
+       wrap.classList.toggle('marineDepthAvailable',state==='available');
+-      wrap.classList.toggle('marineDepthReference',state==='reference');
+-      wrap.classList.toggle('marineDepthFallback',state!=='available'&&state!=='reference');
++      wrap.classList.toggle('marineDepthReference',isDnr);
++      wrap.classList.toggle('marineDepthFallback',state!=='available'&&!isDnr);
+     }
+     const badge=$('depthSourceBadge');
+     if (badge) {
+       badge.classList.remove('noaa','dnr','fallback');
+-      badge.classList.add(state==='available'?'noaa':(state==='reference'?'dnr':'fallback'));
+-      badge.textContent=state==='available'?'NOAA VECTOR • '+(label||'ENC'):(state==='reference'?'DNR REFERENCE • '+(label||'CONTOUR MAP'):'SHORELINE ONLY');
++      badge.classList.add(state==='available'?'noaa':(isDnr?'dnr':'fallback'));
++      badge.textContent=state==='available'?'NOAA VECTOR • '+(label||'ENC'):(state==='survey'?'DNR SURVEY • '+(label||'HISTORICAL'):(state==='reference'?'DNR REFERENCE • '+(label||'CONTOUR MAP'):'SHORELINE ONLY'));
+     }
+     const refBtn=$('depthReferenceBtn');
+-    if (refBtn) refBtn.style.display=(state==='reference'&&selectedLake)?'block':'none';
++    if (refBtn) refBtn.style.display=(isDnr&&selectedLake)?'block':'none';
++  }
++
++  function dnrSurveyPilotForSelectedLake() {
++    if(!selectedLake) return null;
++    return DNR_SURVEY_VECTOR_PACK[String(selectedLake.wbic)]||null;
++  }
++
++  function dnrSurveyPointToLatLng(x,y,bounds) {
++    return L.latLng(bounds.north-(Number(y)*(bounds.north-bounds.south)),bounds.west+(Number(x)*(bounds.east-bounds.west)));
++  }
++
++  function renderDnrSurveyPilot() {
++    const pilot=dnrSurveyPilotForSelectedLake();
++    const bounds=selectedLakeDepthBounds();
++    if(!pilot||!bounds||!map||!depthShadeEnabled||mapMode==='3d') return false;
++    if(depthShadeLayer) { try { map.removeLayer(depthShadeLayer); } catch(e) {} }
++    clearDepthLabelLayer();
++    depthShadeLayer=L.layerGroup().addTo(map);
++    const contours=[...(pilot.contours||[])].sort((a,b)=>Number(a.depthFt)-Number(b.depthFt));
++    contours.forEach(c=>{
++      const latlngs=(c.ring||[]).map(p=>dnrSurveyPointToLatLng(p[0],p[1],bounds));
++      if(latlngs.length<3) return;
++      const band=depthBandForFeet(c.depthFt);
++      L.polygon(latlngs,{
++        pane:'depthPane',interactive:false,
++        color:'rgba(61,113,52,.68)',weight:Number(c.depthFt)%20===0?1.35:1.0,
++        opacity:.90,fillColor:band.fill,fillOpacity:.16
++      }).addTo(depthShadeLayer);
++    });
++    if(Array.isArray(pilot.labels)&&pilot.labels.length&&map.getZoom()>=11) {
++      depthLabelLayer=L.layerGroup().addTo(map);
++      pilot.labels.forEach(item=>{
++        const ll=dnrSurveyPointToLatLng(item.x,item.y,bounds);
++        const isMax=Number(item.depthFt)===Number(pilot.maxDepthFt);
++        const icon=L.divIcon({className:'depthTextIcon',html:'<div class="depthTextLabel'+(isMax?' major':'')+'">'+escapeHtml(depthLabelText(item.depthFt))+'</div>'});
++        L.marker(ll,{icon,interactive:false,pane:'labelPane'}).addTo(depthLabelLayer);
++      });
++    }
++    setMarineDepthState('survey',String(pilot.year)+' • APPROX. REG.');
++    if($('depthLegendStatus')) $('depthLegendStatus').textContent='Wisconsin DNR historical survey • '+pilot.year+' • contours digitized from the public survey sheet and approximately registered to the modern DNR shoreline bounds. Historical/approximate reference only; not for navigation.';
++    return true;
+   }
+ 
+   function selectedLakeDepthBounds() {
+@@ -5533,6 +5626,7 @@
+     if ($('depthLegend')) $('depthLegend').style.display = depthShadeEnabled ? 'block' : 'none';
+     if (offlineMode) {
+       resetVerifiedDepthSurface();
++      if(renderDnrSurveyPilot()) return;
+       const hasDnr=dnrBathymetryAvailable();
+       setMarineDepthState(hasDnr?'reference':'fallback',hasDnr?'OFFLINE CONTOUR MAP':'');
+       if (depthShadeEnabled && $('depthLegendStatus')) $('depthLegendStatus').textContent = hasDnr ? 'Official Wisconsin DNR contour sheet is stored for this lake. It is kept as a reference image because the scan is not safely GPS-georeferenced.' : 'Offline shoreline/base map only; no verified depth layer is available for this saved lake.';
+@@ -5599,6 +5693,7 @@
+         if(mapMode==='3d') sync3dDepthData();
+         return;
+       }
++      if(renderDnrSurveyPilot()) return;
+       const hasDnr=dnrBathymetryAvailable();
+       setMarineDepthState(hasDnr?'reference':'fallback',hasDnr?'WISCONSIN DNR':'');
+       if (depthShadeEnabled && $('depthLegendStatus')) $('depthLegendStatus').textContent = hasDnr ? 'No NOAA vector depth coverage intersects this selected lake. Official Wisconsin DNR contour reference is available; LakeNav does not stretch the scanned sheet onto GPS coordinates.' : (lastError ? 'NOAA vector depth is temporarily unavailable; no artificial contours are drawn.' : 'No verified vector depth coverage intersects this view; shoreline-only marine styling is shown.');
+@@ -6690,9 +6785,11 @@
+       const geojson = await resp.json();
+       if (!geojson.features || !geojson.features.length) throw new Error('No shoreline geometry returned.');
+       resetVerifiedDepthSurface();
++      clearDepthShadeLayer();
+       selectedLake = { name: item.name, wbic: String(item.wbic), geometry: geojson, detail: null };
+       showSelectedLakeOnMap(true);
+       updateSelectedLakeUi();
++      if(depthShadeEnabled) scheduleDepthShadeRefresh();
+       closeSheets();
+       $('lakeSearchStatus').innerHTML = '<div class="good muted">Lake loaded from Wisconsin DNR hydrography.</div>';
+       if (window.Android && Android.loadLakeDetail) Android.loadLakeDetail(selectedLake.wbic);
+@@ -6727,7 +6824,10 @@
+     let meta = 'WBIC: ' + selectedLake.wbic;
+     if (selectedLake.detail && Number.isFinite(Number(selectedLake.detail.maxDepthFt))) meta += ' | Max depth: ' + Number(selectedLake.detail.maxDepthFt) + ' ft';
+     $('selectedLakeMeta').textContent = meta;
+-    if (selectedLake.detail && selectedLake.detail.contourUrl) {
++    const surveyPilot=dnrSurveyPilotForSelectedLake();
++    if (surveyPilot) {
++      $('selectedLakeDetailStatus').innerHTML = '<span class="good">DNR historical survey overlay available.</span> '+escapeHtml(String(surveyPilot.year))+' survey contours are bundled in this pilot and approximately aligned to the modern shoreline. Historical reference only; not for navigation.';
++    } else if (selectedLake.detail && selectedLake.detail.contourUrl) {
+       $('selectedLakeDetailStatus').innerHTML = 'Wisconsin DNR lists an official contour map for this lake.';
+     } else if (selectedLake.detail && selectedLake.detail.ok === false) {
+       $('selectedLakeDetailStatus').innerHTML = 'DNR detail page could not be loaded right now.';
