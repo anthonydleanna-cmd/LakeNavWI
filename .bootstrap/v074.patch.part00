@@ -1,0 +1,94 @@
+--- a/app/src/main/assets/index.html
++++ b/app/src/main/assets/index.html
+@@ -197,6 +197,18 @@
+ .lakeDiscoveryStat span { display:block; color:var(--muted); font-size:8px; font-weight:850; letter-spacing:.06em; text-transform:uppercase; }
+ .lakeDiscoveryStat strong { display:block; margin-top:3px; color:#173b4b; font-size:14px; }
+ .lakeDiscoveryDataRow { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
++.lakeDiscoveryLaunchCard { margin-top:12px; padding:12px; border-radius:17px; background:#f3f8fa; border:1px solid #dfebf0; }
++.lakeDiscoveryLaunchHead { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:7px; }
++.lakeDiscoveryLaunchHead h3 { margin:0; font-size:14px; letter-spacing:-.015em; }
++.lakeDiscoveryLaunchHead .muted { font-size:9px; }
++.lakeDiscoveryLaunchRow { display:grid; grid-template-columns:1fr auto; gap:9px; align-items:center; padding:9px 0; border-top:1px solid rgba(80,126,145,.13); }
++.lakeDiscoveryLaunchRow:first-child { border-top:0; padding-top:3px; }
++.lakeDiscoveryLaunchName { font-size:11px; font-weight:900; color:#183f50; line-height:1.18; }
++.lakeDiscoveryLaunchMeta { margin-top:2px; color:#6b8089; font-size:9px; line-height:1.35; }
++.lakeDiscoveryLaunchActions { display:flex; gap:5px; }
++.lakeDiscoveryLaunchActions button { min-height:31px; padding:0 8px; border-radius:10px; font-size:8px; font-weight:900; }
++.lakeDiscoveryLaunchMarker { filter:drop-shadow(0 2px 3px rgba(0,0,0,.28)); }
++
+ 
+ .offlineBadge { display: inline-block; border-radius: 10px; padding: 2px 7px; background: #e8f4eb; color: #165c2c; font-size: 10px; font-weight: 700; margin-left: 5px; }
+ 
+@@ -838,6 +850,11 @@
+ html.darkMode body .lakeDiscoveryHero { background:linear-gradient(145deg,rgba(22,112,144,.20),rgba(17,87,109,.10)); border-color:#294c5b; }
+ html.darkMode body .lakeDiscoveryStat { background:#102f3c; border-color:#244957; }
+ html.darkMode body .lakeDiscoveryStat strong { color:#e6f5f8; }
++html.darkMode body .lakeDiscoveryLaunchCard { background:#102f3c; border-color:#244957; }
++html.darkMode body .lakeDiscoveryLaunchRow { border-color:rgba(150,196,214,.13); }
++html.darkMode body .lakeDiscoveryLaunchName { color:#e6f5f8; }
++html.darkMode body .lakeDiscoveryLaunchMeta { color:#9fb4bd; }
++
+ 
+ html.darkMode body #compassHud { background:rgba(10,34,47,.96); color:#ecf8fb; }
+ html.darkMode body #compassDial { border-color:#6c91a3; background:radial-gradient(circle,#f1f5f6 0 55%,#cbd9df 56% 100%); }
+@@ -1008,7 +1025,7 @@
+ <div id="app">
+   <div id="statusbar">
+     <div>
+-      <div id="brand">LakeNav WI <span class="versionPill">v0.73</span></div>
++      <div id="brand">LakeNav WI <span class="versionPill">v0.74</span></div>
+       <div id="gpsState">Waiting for GPS...</div>
+       <button id="gpsQualityChip" class="gpsQualityChip noFix" type="button" aria-label="GPS quality"><span class="gpsQualityDot"></span><span id="gpsQualityText">NO FIX</span></button>
+     </div>
+@@ -1127,7 +1144,7 @@
+         <div class="lakeDiscoveryCopy"><span class="lakeDiscoveryEyebrow">Wisconsin lake</span><strong id="lakeDiscoveryName">--</strong><div id="lakeDiscoveryMeta">Tap a lake to identify it.</div></div>
+         <button id="lakeDiscoveryClose" type="button" aria-label="Close lake discovery">×</button>
+       </div>
+-      <div class="lakeDiscoveryBadges"><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoveryDepthBadge">DEPTH • CHECKING</span><span class="lakeDiscoveryBadge" id="lakeDiscoverySourceBadge">DNR HYDRO</span></div>
++      <div class="lakeDiscoveryBadges"><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoveryDepthBadge">DEPTH • CHECKING</span><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoveryLaunchBadge">LAUNCHES • CHECKING</span><span class="lakeDiscoveryBadge" id="lakeDiscoverySourceBadge">DNR HYDRO</span></div>
+       <div id="lakeDiscoveryLoading">Loading Wisconsin DNR lake information…</div>
+       <div class="lakeDiscoveryActions"><button id="lakeDiscoveryExploreBtn" type="button">EXPLORE LAKE</button><button id="lakeDiscoveryLaunchBtn" type="button">LAUNCH</button></div>
+     </div>
+@@ -1318,7 +1335,7 @@
+       <span class="lakeDiscoveryEyebrow">Wisconsin DNR waterbody</span>
+       <h3 id="lakeDiscoverySheetTitle">Selected lake</h3>
+       <div class="lakeDiscoverySheetMeta" id="lakeDiscoverySheetMeta">--</div>
+-      <div class="lakeDiscoveryDataRow"><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoverySheetDepthBadge">DEPTH • CHECKING</span><span class="lakeDiscoveryBadge" id="lakeDiscoverySheetSourceBadge">DNR HYDRO</span></div>
++      <div class="lakeDiscoveryDataRow"><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoverySheetDepthBadge">DEPTH • CHECKING</span><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoverySheetLaunchBadge">LAUNCHES • CHECKING</span><span class="lakeDiscoveryBadge" id="lakeDiscoverySheetSourceBadge">DNR HYDRO</span></div>
+     </div>
+     <div class="lakeDiscoveryGrid">
+       <div class="lakeDiscoveryStat"><span>County</span><strong id="lakeDiscoveryCounty">--</strong></div>
+@@ -1326,8 +1343,11 @@
+       <div class="lakeDiscoveryStat"><span>WBIC</span><strong id="lakeDiscoveryWbic">--</strong></div>
+       <div class="lakeDiscoveryStat"><span>Reported max depth</span><strong id="lakeDiscoveryMaxDepth">--</strong></div>
+     </div>
++    <div class="lakeDiscoveryLaunchCard">
++      <div class="lakeDiscoveryLaunchHead"><div><h3>Public boat access</h3><div class="muted">Wisconsin DNR access sites matched to or near this lake.</div></div><button class="btn small secondary" id="lakeDiscoveryRefreshLaunchesBtn">Refresh</button></div>
++      <div id="lakeDiscoveryLaunchList"><div class="muted">Checking Wisconsin DNR public boat access…</div></div>
++    </div>
+     <div class="btnRow" style="margin-top:12px">
+-      <button class="btn" id="lakeDiscoverySheetLaunchBtn">Navigate to launch</button>
+       <button class="btn secondary" id="lakeDiscoverySheetBathyBtn">Bathymetry</button>
+       <button class="btn secondary" id="lakeDiscoverySheetOfflineBtn">Save offline</button>
+       <button class="btn secondary" id="lakeDiscoverySheetDnrBtn">DNR details</button>
+@@ -1783,6 +1803,8 @@
+   let selectedLake = null;
+   let selectedLakeLayer = null;
+   let lakeDiscoveryRequestId = 0;
++  let lakeDiscoveryLaunchRequestId = 0;
++  let lakeDiscoveryLaunchMarkers = [];
+   let offlineImageLayer = null;
+   let offlineFallbackPackage = null;
+   let lakeSearchResults = [];
+@@ -6774,13 +6796,15 @@
+     return null;
+   }
+ 
+-  function launchCandidateFromFeature(f) {
++  function launchCandidateFromFeature(f,env) {
+     const a=(f&&f.attributes)||{};
+     let lat=Number(a.LL_LAT_DD_AMT), lon=Number(a.LL_LONG_DD_AMT);
+     if ((!Number.isFinite(lat)||!Number.isFinite(lon)) && f && f.geometry) {
+       lon=Number(f.geometry.x); lat=Number(f.geometry.y);
+     }
+     if (!Number.isFinite(lat)||!Number.isFinite(lon)) return null;
