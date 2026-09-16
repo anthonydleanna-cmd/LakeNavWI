@@ -1,0 +1,25 @@
++      if (!features.length) { clearSelectedLakeDiscovery(); return; }
+       const priority=t=>Number(t)===706?0:(Number(t)===707?1:2);
+       features.sort((a,b)=>priority(a.properties&&a.properties.HYDROTYPE)-priority(b.properties&&b.properties.HYDROTYPE)||featureAreaSqMeters(a)-featureAreaSqMeters(b));
+       const f=features[0], p=f.properties||{};
+@@ -7092,7 +7253,9 @@
+   function openLakeDiscoverySheet() {
+     if (!selectedLake) return;
+     updateLakeDiscoveryUi();
++    renderLakeDiscoveryLaunchList();
+     openSheet('lakeDiscoverySheet');
++    if (selectedLake.launchState!=='ready') refreshSelectedLakeLaunches(false);
+   }
+ 
+   async function searchLakes() {
+@@ -8073,8 +8236,8 @@
+     $('searchBtn').addEventListener('click', () => { renderOfflineLakeList(); openSheet('searchSheet'); });
+     $('lakeDiscoveryClose').addEventListener('click', () => setLakeDiscoveryCardVisible(false));
+     $('lakeDiscoveryExploreBtn').addEventListener('click', openLakeDiscoverySheet);
+-    $('lakeDiscoveryLaunchBtn').addEventListener('click', navigateToClosestBoatLaunch);
+-    $('lakeDiscoverySheetLaunchBtn').addEventListener('click', navigateToClosestBoatLaunch);
++    $('lakeDiscoveryLaunchBtn').addEventListener('click', openLakeDiscoverySheet);
++    $('lakeDiscoveryRefreshLaunchesBtn').addEventListener('click', () => refreshSelectedLakeLaunches(true));
+     $('lakeDiscoverySheetBathyBtn').addEventListener('click', openSelectedBathymetry);
+     $('lakeDiscoverySheetOfflineBtn').addEventListener('click', saveSelectedLakeOffline);
+     $('lakeDiscoverySheetDnrBtn').addEventListener('click', () => { if(selectedLake&&selectedLake.wbic) openExternal('https://apps.dnr.wi.gov/lakes/lakepages/LakeDetail.aspx?wbic='+encodeURIComponent(selectedLake.wbic)); });
