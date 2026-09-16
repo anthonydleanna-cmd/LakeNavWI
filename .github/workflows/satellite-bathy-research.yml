@@ -44,6 +44,9 @@ jobs:
           CPL_VSIL_CURL_ALLOWED_EXTENSIONS: .tif,.TIF
         run: python research/sand_substrate_validate.py
 
+      - name: Validate Planetary Computer optical-shallows tiles
+        run: python research/pc_optical_shallows_endpoint_test.py
+
       - name: Upload validation outputs
         uses: actions/upload-artifact@v4
         with:
@@ -52,3 +55,4 @@ jobs:
             research_validation
             research_optical_shallows
             research_sand_validation
+            research_pc_shallows
