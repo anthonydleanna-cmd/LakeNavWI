@@ -22,13 +22,15 @@ jobs:
           python-version: "3.12"
 
       - name: Install research dependencies
-        run: pip install requests beautifulsoup4 shapely
+        run: pip install requests beautifulsoup4 shapely geopandas pyogrio pyarrow
 
       - name: Run Wisconsin depth census
-        run: python research/depth-data-sources/census.py
+        run: python research/depth-data-sources/census_local_dnr.py
 
       - name: Upload census output
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: wisconsin-depth-census-core
           path: research/depth-data-sources/output/
+          if-no-files-found: warn
