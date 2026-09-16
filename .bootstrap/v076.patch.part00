@@ -1,0 +1,150 @@
+--- a/app/src/main/assets/index.html
++++ b/app/src/main/assets/index.html
+@@ -182,7 +182,7 @@
+ .lakeDiscoveryBadge.good { background:#e4f7f0; color:#17664c; }
+ .lakeDiscoveryBadge.warn { background:#fff1d9; color:#865214; }
+ .lakeDiscoveryBadge.mutedBadge { background:#eef2f4; color:#61737c; }
+-.lakeDiscoveryActions { display:grid; grid-template-columns:1fr auto; gap:8px; margin-top:10px; }
++.lakeDiscoveryActions { display:grid; grid-template-columns:1fr auto auto; gap:8px; margin-top:10px; }
+ #lakeDiscoveryExploreBtn { min-height:40px; border:0; border-radius:14px; background:linear-gradient(145deg,#0c88bc,#096a98); color:#fff; font-size:11px; font-weight:900; letter-spacing:.025em; }
+ #lakeDiscoveryLaunchBtn { min-height:40px; border:1px solid #c7dbe4; border-radius:14px; padding:0 12px; background:#f4f9fb; color:#1c566e; font-size:10px; font-weight:850; }
+ #lakeDiscoveryLoading { display:none; margin-top:7px; font-size:9px; color:#6c818b; }
+@@ -197,6 +197,31 @@
+ .lakeDiscoveryStat span { display:block; color:var(--muted); font-size:8px; font-weight:850; letter-spacing:.06em; text-transform:uppercase; }
+ .lakeDiscoveryStat strong { display:block; margin-top:3px; color:#173b4b; font-size:14px; }
+ .lakeDiscoveryDataRow { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
++.lakeLibraryHero { padding:14px; border-radius:20px; background:linear-gradient(145deg,rgba(14,128,169,.14),rgba(40,191,190,.06)); border:1px solid rgba(43,143,174,.14); }
++.lakeLibraryHeroTop { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
++.lakeLibraryHero h3 { margin:2px 0 3px; font-size:22px; letter-spacing:-.035em; }
++.lakeLibraryHero .muted { font-size:10px; }
++.lakeLibraryTopActions { display:flex; flex-wrap:wrap; gap:7px; margin-top:11px; }
++.lakeLibrarySection { margin-top:12px; padding:12px; border-radius:18px; background:#f4f8fa; border:1px solid #e0eaee; }
++.lakeLibrarySectionHead { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
++.lakeLibrarySectionHead h3 { margin:0; font-size:14px; letter-spacing:-.015em; }
++.lakeLibraryCount { display:inline-flex; align-items:center; justify-content:center; min-width:24px; height:22px; padding:0 7px; border-radius:999px; background:#e5f2f6; color:#17607a; font-size:8px; font-weight:950; }
++.lakeLibraryNearbyControls { display:flex; align-items:center; gap:7px; }
++.lakeLibraryNearbyControls select { min-height:32px; border:1px solid #c9d8de; border-radius:10px; background:#fff; color:#21495a; padding:0 7px; font-size:10px; font-weight:800; }
++.lakeLibraryRow { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:9px; align-items:center; padding:10px 0; border-top:1px solid rgba(70,116,136,.12); }
++.lakeLibraryRow:first-child { border-top:0; padding-top:2px; }
++.lakeLibraryName { display:flex; align-items:center; gap:6px; min-width:0; }
++.lakeLibraryName strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:#173e50; }
++.lakeLibraryMeta { margin-top:3px; color:#6b8089; font-size:9px; line-height:1.35; }
++.lakeLibraryRowActions { display:flex; gap:5px; align-items:center; }
++.lakeLibraryRowActions .btn { min-height:31px; padding:0 9px; border-radius:10px; font-size:8px; }
++.lakeFavoriteBtn { width:34px; min-width:34px; height:34px; padding:0!important; border-radius:50%!important; font-size:18px!important; line-height:1; }
++.lakeFavoriteBtn.active { background:#fff2c9!important; border-color:#e4bd4d!important; color:#8a6200!important; }
++#lakeDiscoveryFavoriteBtn { min-height:40px; width:42px; padding:0; border:1px solid #c7dbe4; border-radius:14px; background:#f4f9fb; color:#1c566e; font-size:18px; font-weight:900; }
++#lakeDiscoveryFavoriteBtn.active, #lakeDiscoverySheetFavoriteBtn.active { background:#fff2c9; border-color:#e4bd4d; color:#8a6200; }
++.lakeLibraryEmpty { color:#71858d; font-size:10px; line-height:1.4; padding:5px 0; }
++.lakeLibraryOfflineBadge { display:inline-flex; margin-left:5px; padding:2px 6px; border-radius:999px; background:#e5f5eb; color:#17643a; font-size:7px; font-weight:900; text-transform:uppercase; }
++
+ .lakeDiscoveryLaunchCard { margin-top:12px; padding:12px; border-radius:17px; background:#f3f8fa; border:1px solid #dfebf0; }
+ .lakeDiscoveryLaunchHead { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:7px; }
+ .lakeDiscoveryLaunchHead h3 { margin:0; font-size:14px; letter-spacing:-.015em; }
+@@ -871,6 +896,16 @@
+ html.darkMode body .lakeDiscoveryHero { background:linear-gradient(145deg,rgba(22,112,144,.20),rgba(17,87,109,.10)); border-color:#294c5b; }
+ html.darkMode body .lakeDiscoveryStat { background:#102f3c; border-color:#244957; }
+ html.darkMode body .lakeDiscoveryStat strong { color:#e6f5f8; }
++html.darkMode body .lakeLibraryHero { background:linear-gradient(145deg,rgba(22,112,144,.20),rgba(17,87,109,.10)); border-color:#294c5b; }
++html.darkMode body .lakeLibrarySection { background:#102f3c; border-color:#244957; }
++html.darkMode body .lakeLibraryRow { border-color:rgba(150,196,214,.13); }
++html.darkMode body .lakeLibraryName strong { color:#e6f5f8; }
++html.darkMode body .lakeLibraryMeta, html.darkMode body .lakeLibraryEmpty { color:#9fb4bd; }
++html.darkMode body .lakeLibraryCount { background:#153b4a; color:#bfeefa; }
++html.darkMode body .lakeLibraryNearbyControls select { background:#0e2c38; color:#e7f5f8; border-color:#2b5362; }
++html.darkMode body #lakeDiscoveryFavoriteBtn { background:#123440; color:#d9f0f5; border-color:#2b5362; }
++html.darkMode body #lakeDiscoveryFavoriteBtn.active, html.darkMode body #lakeDiscoverySheetFavoriteBtn.active, html.darkMode body .lakeFavoriteBtn.active { background:#4c3d16!important; border-color:#8f742a!important; color:#ffe38a!important; }
++
+ html.darkMode body .lakeDiscoveryLaunchCard { background:#102f3c; border-color:#244957; }
+ html.darkMode body .lakeDiscoveryLaunchRow { border-color:rgba(150,196,214,.13); }
+ html.darkMode body .lakeDiscoveryLaunchName { color:#e6f5f8; }
+@@ -1055,7 +1090,7 @@
+ <div id="app">
+   <div id="statusbar">
+     <div>
+-      <div id="brand">LakeNav WI <span class="versionPill">v0.75</span></div>
++      <div id="brand">LakeNav WI <span class="versionPill">v0.76</span></div>
+       <div id="gpsState">Waiting for GPS...</div>
+       <button id="gpsQualityChip" class="gpsQualityChip noFix" type="button" aria-label="GPS quality"><span class="gpsQualityDot"></span><span id="gpsQualityText">NO FIX</span></button>
+     </div>
+@@ -1176,7 +1211,7 @@
+       </div>
+       <div class="lakeDiscoveryBadges"><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoveryDepthBadge">DEPTH • CHECKING</span><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoveryLaunchBadge">LAUNCHES • CHECKING</span><span class="lakeDiscoveryBadge mutedBadge" id="lakeDiscoveryFishBadge">FISH • CHECKING</span><span class="lakeDiscoveryBadge" id="lakeDiscoverySourceBadge">DNR HYDRO</span></div>
+       <div id="lakeDiscoveryLoading">Loading Wisconsin DNR lake information…</div>
+-      <div class="lakeDiscoveryActions"><button id="lakeDiscoveryExploreBtn" type="button">EXPLORE LAKE</button><button id="lakeDiscoveryLaunchBtn" type="button">LAUNCH</button></div>
++      <div class="lakeDiscoveryActions"><button id="lakeDiscoveryExploreBtn" type="button">EXPLORE LAKE</button><button id="lakeDiscoveryFavoriteBtn" type="button" aria-label="Favorite lake">☆</button><button id="lakeDiscoveryLaunchBtn" type="button">LAUNCH</button></div>
+     </div>
+     <button id="orientationBtn" class="map-chip chipBtn">NORTH UP</button>
+     <button id="mobBtn" aria-label="Man overboard - mark current position and navigate back"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M6.3 6.3 9.9 9.9M14.1 14.1l3.6 3.6M17.7 6.3l-3.6 3.6M9.9 14.1l-3.6 3.6"/></svg><span>MOB</span></button>
+@@ -1325,6 +1360,32 @@
+   </div>
+ </div>
+ 
++<div class="sheetBackdrop" id="lakeLibrarySheet">
++  <div class="sheet">
++    <div class="sheetHeader"><h2>Lake library</h2><button class="closeBtn" data-close="lakeLibrarySheet">x</button></div>
++    <div class="lakeLibraryHero">
++      <div class="lakeLibraryHeroTop"><div><span class="lakeDiscoveryEyebrow">Wisconsin lakes</span><h3>Your lake library</h3><div class="muted">Favorites, recent discoveries, nearby water and saved offline lakes in one place.</div></div><span class="lakeDiscoveryBadge good">DNR CONNECTED</span></div>
++      <div class="lakeLibraryTopActions"><button class="btn" id="lakeLibrarySearchBtn">SEARCH WISCONSIN LAKES</button><button class="btn secondary" id="lakeLibraryRefreshBtn">REFRESH LIBRARY</button></div>
++    </div>
++    <div class="lakeLibrarySection">
++      <div class="lakeLibrarySectionHead"><h3>★ Favorites</h3><span class="lakeLibraryCount" id="lakeLibraryFavoriteCount">0</span></div>
++      <div id="lakeLibraryFavorites"><div class="lakeLibraryEmpty">Favorite a lake from Lake Discovery and it will stay here.</div></div>
++    </div>
++    <div class="lakeLibrarySection">
++      <div class="lakeLibrarySectionHead"><h3>Recently viewed</h3><span class="lakeLibraryCount" id="lakeLibraryRecentCount">0</span></div>
++      <div id="lakeLibraryRecents"><div class="lakeLibraryEmpty">Lakes you explore will appear here automatically.</div></div>
++    </div>
++    <div class="lakeLibrarySection">
++      <div class="lakeLibrarySectionHead"><div><h3>Nearby lakes</h3><div class="muted" id="lakeLibraryNearbyStatus">Uses the current GPS position.</div></div><div class="lakeLibraryNearbyControls"><select id="lakeLibraryNearbyRadius" aria-label="Nearby lake radius"><option value="10">10 mi</option><option value="25">25 mi</option><option value="50">50 mi</option></select><button class="btn small secondary" id="lakeLibraryNearbyRefreshBtn">Refresh</button></div></div>
++      <div id="lakeLibraryNearby"><div class="lakeLibraryEmpty">Open the library with a GPS fix to find nearby lakes.</div></div>
++    </div>
++    <div class="lakeLibrarySection">
++      <div class="lakeLibrarySectionHead"><h3>Offline lakes</h3><span class="lakeLibraryCount" id="lakeLibraryOfflineCount">0</span></div>
++      <div id="lakeLibraryOffline"><div class="lakeLibraryEmpty">No offline lake packages saved yet.</div></div>
++    </div>
++  </div>
++</div>
++
+ <div class="sheetBackdrop" id="searchSheet">
+   <div class="sheet">
+     <div class="sheetHeader"><h2>Find a Wisconsin lake</h2><button class="closeBtn" data-close="searchSheet">x</button></div>
+@@ -1390,6 +1451,7 @@
+       <div class="lakeFishingDisclaimer">Regulations are a live DNR reference and can change. Always verify the current DNR rule page before fishing; special trout, border-water and tribal rules may be separate.</div>
+     </div>
+     <div class="btnRow" style="margin-top:12px">
++      <button class="btn secondary" id="lakeDiscoverySheetFavoriteBtn">☆ Favorite</button>
+       <button class="btn secondary" id="lakeDiscoverySheetBathyBtn">Bathymetry</button>
+       <button class="btn secondary" id="lakeDiscoverySheetOfflineBtn">Save offline</button>
+       <button class="btn secondary" id="lakeDiscoverySheetDnrBtn">DNR details</button>
+@@ -1612,6 +1674,9 @@
+   const STORAGE_XWEATHER_ID = 'lakenav.xweather.clientid.v1';
+   const STORAGE_XWEATHER_SECRET = 'lakenav.xweather.secret.v1';
+   const STORAGE_ROUTES = 'lakenav.routes.v1';
++  const STORAGE_LAKE_FAVORITES = 'lakenav.lakes.favorites.v1';
++  const STORAGE_LAKE_RECENTS = 'lakenav.lakes.recents.v1';
++  const STORAGE_LAKE_NEARBY_RADIUS = 'lakenav.lakes.nearby.radius.v1';
+   const STORAGE_MAP_MODE = 'lakenav.mapmode.v1';
+   const STORAGE_NAV_PERSPECTIVE = 'lakenav.navperspective.v1';
+   const STORAGE_NOAA_AIDS = 'lakenav.noaaaids.v1';
+@@ -1850,6 +1915,13 @@
+   let lakeDiscoveryFishingRequestId = 0;
+   let nativeDnrRequestSeq = 0;
+   const nativeDnrRequests = new Map();
++  let lakeFavorites = loadJson(STORAGE_LAKE_FAVORITES, []);
++  let lakeRecents = loadJson(STORAGE_LAKE_RECENTS, []);
++  let lakeNearby = [];
++  let lakeNearbyRequestId = 0;
++  let lakeLibraryEntryMap = new Map();
++  let lakeLibraryEntrySeq = 0;
++  let lakeNearbyRadiusMiles = [10,25,50].includes(Number(localStorage.getItem(STORAGE_LAKE_NEARBY_RADIUS))) ? Number(localStorage.getItem(STORAGE_LAKE_NEARBY_RADIUS)) : 25;
+   let offlineImageLayer = null;
+   let offlineFallbackPackage = null;
+   let lakeSearchResults = [];
+@@ -7220,6 +7292,185 @@
+   }
+ 
+ 
++  function lakeLibraryKey(entry) {
++    if (!entry) return '';
++    if (entry.wbic) return 'wbic:'+String(entry.wbic);
