@@ -37,6 +37,13 @@ jobs:
       - name: Run optical shallows study
         run: python research/optical_shallows_eval.py
 
+      - name: Run probable-sand validation
+        env:
+          GDAL_HTTP_MULTIPLEX: YES
+          GDAL_DISABLE_READDIR_ON_OPEN: EMPTY_DIR
+          CPL_VSIL_CURL_ALLOWED_EXTENSIONS: .tif,.TIF
+        run: python research/sand_substrate_validate.py
+
       - name: Upload validation outputs
         uses: actions/upload-artifact@v4
         with:
@@ -44,3 +51,4 @@ jobs:
           path: |
             research_validation
             research_optical_shallows
+            research_sand_validation
