@@ -55,7 +55,6 @@ def ensure_dnr_gdb() -> Path:
         z.extractall(EXTRACT)
     gdbs = list(EXTRACT.glob('*.gdb'))
     if not gdbs:
-        # Some archives may include a containing directory.
         gdbs = list(EXTRACT.rglob('*.gdb'))
     if not gdbs:
         raise RuntimeError('DNR File Geodatabase not found after extraction')
@@ -78,6 +77,8 @@ def choose_waterbody_layer(gdb: Path) -> str:
             score += 2
         if 'polygon' in gt:
             score += 4
+        if 'wbic' in n:
+            score += 3
         if score:
             candidates.append((score, str(name)))
     if not candidates:
@@ -91,16 +92,19 @@ def local_load_dnr_waterbodies():
     gdb = ensure_dnr_gdb()
     layer = choose_waterbody_layer(gdb)
     info = pyogrio.read_info(gdb, layer=layer)
-    fields = list(info.get('fields') or [])
+    raw_fields = info.get('fields')
+    fields = list(raw_fields) if raw_fields is not None else []
     upper = {str(x).upper(): str(x) for x in fields}
-    required = ['WATERBODY_WBIC', 'HYDROTYPE']
+    required = ['WATERBODY_WBIC']
     missing = [x for x in required if x not in upper]
     if missing:
         raise RuntimeError(f'DNR waterbody layer missing required fields {missing}; fields={fields[:80]}')
     wanted_upper = ['OBJECTID', 'HYDROID', 'WATERBODY_WBIC', 'WATERBODY_NAME', 'WATERBODY_ROW_NAME', 'HYDROTYPE', 'ORIG_HRZ_SRC_YR']
     wanted = [upper[x] for x in wanted_upper if x in upper]
+    print('DNR waterbody fields used: ' + ', '.join(wanted), flush=True)
     print('Reading lake/pond and reservoir polygons from local DNR geodatabase...', flush=True)
-    df = pyogrio.read_dataframe(gdb, layer=layer, columns=wanted, where=f'{upper["HYDROTYPE"]} IN (706,707)')
+    where = f'{upper["HYDROTYPE"]} IN (706,707)' if 'HYDROTYPE' in upper else None
+    df = pyogrio.read_dataframe(gdb, layer=layer, columns=wanted, where=where)
     print(f'  DNR hydro polygon features: {len(df):,}', flush=True)
     if df.crs is None:
         raise RuntimeError('DNR geodatabase waterbody layer has no CRS')
@@ -110,8 +114,9 @@ def local_load_dnr_waterbodies():
     groups = defaultdict(list)
     props = defaultdict(list)
     oid_col = upper.get('OBJECTID') or upper.get('HYDROID')
+    wbic_col = upper['WATERBODY_WBIC']
     for idx, row in df.iterrows():
-        wbic_val = row.get(upper['WATERBODY_WBIC'])
+        wbic_val = row.get(wbic_col)
         try:
             wbic = int(wbic_val) if wbic_val not in (None, '', 0, '0') else None
         except Exception:
