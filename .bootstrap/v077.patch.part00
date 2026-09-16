@@ -1,0 +1,144 @@
+--- a/app/src/main/assets/index.html
++++ b/app/src/main/assets/index.html
+@@ -221,6 +221,10 @@
+ #lakeDiscoveryFavoriteBtn.active, #lakeDiscoverySheetFavoriteBtn.active { background:#fff2c9; border-color:#e4bd4d; color:#8a6200; }
+ .lakeLibraryEmpty { color:#71858d; font-size:10px; line-height:1.4; padding:5px 0; }
+ .lakeLibraryOfflineBadge { display:inline-flex; margin-left:5px; padding:2px 6px; border-radius:999px; background:#e5f5eb; color:#17643a; font-size:7px; font-weight:900; text-transform:uppercase; }
++.lakeLibraryBoatedHeadRight { display:flex; align-items:center; gap:7px; }
++.lakeLibraryTripBadge { display:inline-flex; align-items:center; padding:2px 6px; border-radius:999px; background:#e6f6f0; color:#176448; font-size:7px; font-weight:950; text-transform:uppercase; letter-spacing:.04em; }
++.lakeLibrarySyncStatus { margin-top:-2px; margin-bottom:7px; color:#71858d; font-size:9px; line-height:1.35; }
++
+ 
+ .lakeDiscoveryLaunchCard { margin-top:12px; padding:12px; border-radius:17px; background:#f3f8fa; border:1px solid #dfebf0; }
+ .lakeDiscoveryLaunchHead { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:7px; }
+@@ -905,6 +909,9 @@
+ html.darkMode body .lakeLibraryNearbyControls select { background:#0e2c38; color:#e7f5f8; border-color:#2b5362; }
+ html.darkMode body #lakeDiscoveryFavoriteBtn { background:#123440; color:#d9f0f5; border-color:#2b5362; }
+ html.darkMode body #lakeDiscoveryFavoriteBtn.active, html.darkMode body #lakeDiscoverySheetFavoriteBtn.active, html.darkMode body .lakeFavoriteBtn.active { background:#4c3d16!important; border-color:#8f742a!important; color:#ffe38a!important; }
++html.darkMode body .lakeLibraryTripBadge { background:#153f37; color:#b9efdd; }
++html.darkMode body .lakeLibrarySyncStatus { color:#9fb4bd; }
++
+ 
+ html.darkMode body .lakeDiscoveryLaunchCard { background:#102f3c; border-color:#244957; }
+ html.darkMode body .lakeDiscoveryLaunchRow { border-color:rgba(150,196,214,.13); }
+@@ -1090,7 +1097,7 @@
+ <div id="app">
+   <div id="statusbar">
+     <div>
+-      <div id="brand">LakeNav WI <span class="versionPill">v0.76</span></div>
++      <div id="brand">LakeNav WI <span class="versionPill">v0.77</span></div>
+       <div id="gpsState">Waiting for GPS...</div>
+       <button id="gpsQualityChip" class="gpsQualityChip noFix" type="button" aria-label="GPS quality"><span class="gpsQualityDot"></span><span id="gpsQualityText">NO FIX</span></button>
+     </div>
+@@ -1372,6 +1379,11 @@
+       <div id="lakeLibraryFavorites"><div class="lakeLibraryEmpty">Favorite a lake from Lake Discovery and it will stay here.</div></div>
+     </div>
+     <div class="lakeLibrarySection">
++      <div class="lakeLibrarySectionHead"><div><h3>Recently boated</h3><div class="muted">Matched from saved Track logs against Wisconsin DNR lake boundaries.</div></div><div class="lakeLibraryBoatedHeadRight"><span class="lakeLibraryCount" id="lakeLibraryBoatedCount">0</span><button class="btn small secondary" id="lakeLibrarySyncTracksBtn">Sync tracks</button></div></div>
++      <div id="lakeLibraryBoatedStatus" class="lakeLibrarySyncStatus">No Track logs matched yet.</div>
++      <div id="lakeLibraryBoated"><div class="lakeLibraryEmpty">Completed Track sessions will appear here after LakeNav matches them to Wisconsin lakes.</div></div>
++    </div>
++    <div class="lakeLibrarySection">
+       <div class="lakeLibrarySectionHead"><h3>Recently viewed</h3><span class="lakeLibraryCount" id="lakeLibraryRecentCount">0</span></div>
+       <div id="lakeLibraryRecents"><div class="lakeLibraryEmpty">Lakes you explore will appear here automatically.</div></div>
+     </div>
+@@ -1676,6 +1688,7 @@
+   const STORAGE_ROUTES = 'lakenav.routes.v1';
+   const STORAGE_LAKE_FAVORITES = 'lakenav.lakes.favorites.v1';
+   const STORAGE_LAKE_RECENTS = 'lakenav.lakes.recents.v1';
++  const STORAGE_LAKE_TRACK_MATCHES = 'lakenav.lakes.trackmatches.v1';
+   const STORAGE_LAKE_NEARBY_RADIUS = 'lakenav.lakes.nearby.radius.v1';
+   const STORAGE_MAP_MODE = 'lakenav.mapmode.v1';
+   const STORAGE_NAV_PERSPECTIVE = 'lakenav.navperspective.v1';
+@@ -1917,6 +1930,9 @@
+   const nativeDnrRequests = new Map();
+   let lakeFavorites = loadJson(STORAGE_LAKE_FAVORITES, []);
+   let lakeRecents = loadJson(STORAGE_LAKE_RECENTS, []);
++  let lakeTrackMatches = loadJson(STORAGE_LAKE_TRACK_MATCHES, []);
++  let lakeTrackSyncActive = false;
++  let lakeTrackSyncRunId = 0;
+   let lakeNearby = [];
+   let lakeNearbyRequestId = 0;
+   let lakeLibraryEntryMap = new Map();
+@@ -2026,6 +2042,7 @@
+     saveTrackHistory();
+     renderTrackHistoryOverlays();
+     renderTrackHistorySettings();
++    if ($('lakeLibrarySheet') && $('lakeLibrarySheet').classList.contains('open')) setTimeout(()=>syncRecentlyBoatedFromTrackLogs(false),0);
+   }
+ 
+   function historyRangeStart() {
+@@ -7366,6 +7383,177 @@
+     if(sheet) { sheet.textContent=active?'★ Favorited':'☆ Favorite'; sheet.classList.toggle('active',active); }
+   }
+ 
++  function saveLakeTrackMatches() {
++    const validIds=new Set((trackHistory||[]).map(h=>String(h&&h.id||'')).filter(Boolean));
++    const dedup=new Map();
++    (lakeTrackMatches||[]).forEach(r=>{ if(r&&validIds.has(String(r.trackId||''))) dedup.set(String(r.trackId),r); });
++    lakeTrackMatches=[...dedup.values()].sort((a,b)=>Number(a.trackEndTime||0)-Number(b.trackEndTime||0)).slice(-120);
++    localStorage.setItem(STORAGE_LAKE_TRACK_MATCHES,JSON.stringify(lakeTrackMatches));
++  }
++
++  function pointInLakeRing(lon,lat,ring) {
++    if(!Array.isArray(ring)||ring.length<3) return false;
++    let inside=false;
++    for(let i=0,j=ring.length-1;i<ring.length;j=i++) {
++      const xi=Number(ring[i]&&ring[i][0]), yi=Number(ring[i]&&ring[i][1]);
++      const xj=Number(ring[j]&&ring[j][0]), yj=Number(ring[j]&&ring[j][1]);
++      if(!Number.isFinite(xi)||!Number.isFinite(yi)||!Number.isFinite(xj)||!Number.isFinite(yj)) continue;
++      const crosses=((yi>lat)!==(yj>lat)) && (lon < (xj-xi)*(lat-yi)/((yj-yi)||1e-12)+xi);
++      if(crosses) inside=!inside;
++    }
++    return inside;
++  }
++
++  function pointInLakeFeature(lat,lon,feature) {
++    const g=feature&&feature.geometry; if(!g||!Array.isArray(g.coordinates)) return false;
++    const inPoly=poly=>{
++      if(!Array.isArray(poly)||!poly.length||!pointInLakeRing(lon,lat,poly[0])) return false;
++      for(let i=1;i<poly.length;i++) if(pointInLakeRing(lon,lat,poly[i])) return false;
++      return true;
++    };
++    if(g.type==='Polygon') return inPoly(g.coordinates);
++    if(g.type==='MultiPolygon') return g.coordinates.some(inPoly);
++    return false;
++  }
++
++  function trackProbePaths(points,maxPoints=34) {
++    const segments=splitTrackSegments(points||[]).filter(seg=>seg.length>=2);
++    if(!segments.length) return [];
++    const totalRaw=segments.reduce((s,x)=>s+x.length,0)||1;
++    return segments.map(seg=>{
++      const budget=Math.max(2,Math.round(maxPoints*(seg.length/totalRaw)));
++      if(seg.length<=budget) return seg.map(p=>[Number(p.lon),Number(p.lat)]);
++      const out=[]; const step=(seg.length-1)/(budget-1);
++      for(let i=0;i<budget;i++) { const p=seg[Math.min(seg.length-1,Math.round(i*step))]; out.push([Number(p.lon),Number(p.lat)]); }
++      return out;
++    }).filter(path=>path.length>=2);
++  }
++
++  async function queryTrackLakeCandidates(history) {
++    const paths=trackProbePaths(history&&history.points,34);
++    if(!paths.length) return [];
++    const geometry=JSON.stringify({paths});
++    const url=dnrLakeQueryBase()+'where='+encodeURIComponent('HYDROTYPE IN (706,707,710)')+
++      '&geometry='+encodeURIComponent(geometry)+'&geometryType=esriGeometryPolyline&inSR=4326&spatialRel=esriSpatialRelIntersects'+
++      '&outFields='+encodeURIComponent('OBJECTID,WATERBODY_NAME,WATERBODY_ROW_NAME,WATERBODY_WBIC,HYDROTYPE')+
++      '&returnGeometry=true&outSR=4326&geometryPrecision=6&maxAllowableOffset=0.00005&resultRecordCount=60&f=geojson';
++    const resp=await fetch(url);
++    if(!resp.ok) throw new Error('DNR track lake lookup HTTP '+resp.status);
++    const json=await resp.json();
++    return Array.isArray(json&&json.features)?json.features:[];
++  }
++
++  function trackLakeMatchesForHistory(history,features) {
++    const points=(history&&Array.isArray(history.points)?history.points:[]).filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon)));
++    if(points.length<2||!features.length) return [];
++    const candidates=features.map(f=>{
++      const p=f.properties||{}, center=geojsonCenter({type:'FeatureCollection',features:[f]});
++      return {feature:f,name:p.WATERBODY_NAME||p.WATERBODY_ROW_NAME||'Unnamed Lake',wbic:p.WATERBODY_WBIC?String(p.WATERBODY_WBIC):'',center,acres:featureAreaSqMeters(f)/4046.8564224,area:featureAreaSqMeters(f)};
++    }).filter(c=>c.center);
++    const stats=new Map();
++    const statFor=c=>{
++      const key=c.wbic?'wbic:'+c.wbic:'geo:'+Number(c.center.lat).toFixed(4)+','+Number(c.center.lon).toFixed(4);
