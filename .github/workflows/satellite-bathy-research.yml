@@ -1,0 +1,36 @@
+name: Satellite Bathymetry Research
+
+on:
+  push:
+    branches: [ "research/satellite-bathymetry-test" ]
+  workflow_dispatch:
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out LakeNav research branch
+        uses: actions/checkout@v4
+
+      - name: Check out NTL digital bathymetry reference
+        uses: actions/checkout@v4
+        with:
+          repository: hdugan/NTLlakeloads
+          path: /tmp/NTLlakeloads
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install analysis dependencies
+        run: pip install geopandas requests pyogrio shapely pyproj
+
+      - name: Run discovery
+        run: python research/satellite_bathy_discovery.py
+
+      - name: Upload discovery outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: satellite-bathy-discovery
+          path: research_output
