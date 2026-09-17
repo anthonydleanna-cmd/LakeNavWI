@@ -51,5 +51,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: LakeNavWI-v0.78-debug-apk
+          name: LakeNavWI-v0.79-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
