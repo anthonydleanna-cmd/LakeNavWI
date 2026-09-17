@@ -1,6 +1,7 @@
 name: Export current LakeNav source
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" ]
     paths:
@@ -13,48 +14,12 @@ jobs:
       - name: Check out project
         uses: actions/checkout@v4
 
-      - name: Materialize LakeNav WI v0.4
-        run: bash .bootstrap/apply-v04.sh
-      - name: Apply LakeNav WI v0.5
-        run: bash .bootstrap/apply-v05.sh
-      - name: Apply LakeNav WI v0.6
-        run: bash .bootstrap/apply-v06.sh
-      - name: Apply LakeNav WI v0.7
-        run: bash .bootstrap/apply-v07.sh
-      - name: Apply LakeNav WI v0.8
-        run: bash .bootstrap/apply-v08.sh
-      - name: Apply LakeNav WI v0.9
-        run: bash .bootstrap/apply-v09.sh
-      - name: Apply LakeNav WI v0.10
-        run: bash .bootstrap/apply-v010.sh
-      - name: Apply LakeNav WI v0.11
-        run: bash .bootstrap/apply-v011.sh
-      - name: Apply LakeNav WI v0.12
-        run: bash .bootstrap/apply-v012.sh
-      - name: Apply LakeNav WI v0.13
-        run: bash .bootstrap/apply-v013.sh
-      - name: Apply LakeNav WI v0.14
-        run: bash .bootstrap/apply-v014.sh
-      - name: Apply LakeNav WI v0.15
-        run: bash .bootstrap/apply-v015.sh
-      - name: Apply LakeNav WI v0.16
-        run: bash .bootstrap/apply-v016.sh
-      - name: Apply LakeNav WI v0.17
-        run: bash .bootstrap/apply-v017.sh
-      - name: Apply LakeNav WI v0.18
-        run: bash .bootstrap/apply-v018.sh
-      - name: Apply LakeNav WI v0.19
-        run: bash .bootstrap/apply-v019.sh
-      - name: Apply LakeNav WI v0.20
-        run: bash .bootstrap/apply-v020.sh
-      - name: Apply LakeNav WI v0.21
-        run: bash .bootstrap/apply-v021.sh
-      - name: Apply LakeNav WI v0.22
-        run: bash .bootstrap/apply-v022.sh
-      - name: Apply LakeNav WI v0.23
-        run: bash .bootstrap/apply-v023.sh
-      - name: Apply LakeNav WI v0.24
-        run: bash .bootstrap/apply-v024.sh
+      - name: Materialize LakeNav WI through latest patch
+        run: |
+          find .bootstrap -maxdepth 1 -type f -name 'apply-v*.sh' -print | sort -V | while read -r script; do
+            echo "Applying $script"
+            bash "$script"
+          done
 
       - name: Collect source snapshot
         run: |
@@ -67,5 +32,5 @@ jobs:
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: LakeNavWI-v0.24-source-snapshot
+          name: LakeNavWI-current-source-snapshot
           path: source-snapshot
